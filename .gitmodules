@@ -1,0 +1,4 @@
+[submodule "benchmark/or1200/or1200"]
+	path = benchmark/or1200/or1200
+	url = https://github.com/Jackie425/or1200.git
+	branch = master

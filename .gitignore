@@ -1,0 +1,18 @@
+# Build directories
+build/
+**/build/
+
+# Editor temporary files
+*~
+.*.swp
+.*.swo
+*.tmp
+
+# IDE files
+.vscode/
+.idea/
+*.code-workspace
+
+# OS files
+.DS_Store
+Thumbs.db

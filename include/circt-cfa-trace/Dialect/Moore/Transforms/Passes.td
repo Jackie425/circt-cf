@@ -1,0 +1,31 @@
+//===- Passes.td - Moore transform passes ----------------*- tablegen -*-===//
+//
+// Part of the circt-cfa-trace project.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef CIRCT_CFA_TRACE_DIALECT_MOORE_TRANSFORMS_PASSES
+#define CIRCT_CFA_TRACE_DIALECT_MOORE_TRANSFORMS_PASSES
+
+include "mlir/Pass/PassBase.td"
+
+def NormalizeProcedures : Pass<"moore-normalize-procedures", "::circt::moore::SVModuleOp"> {
+  let summary = "Convert always procedures with sensitivity lists to always_comb";
+  let description = [{
+    This pass identifies Moore `always` procedures that have explicit sensitivity
+    lists (via wait_event) and converts them to `always_comb` when they represent
+    pure combinational logic.
+  }];
+  let constructor = "circt::cfatrace::moore::createNormalizeProceduresPass()";
+}
+
+def MergeProcedures : Pass<"moore-merge-procedures", "::circt::moore::SVModuleOp"> {
+  let summary = "Merge procedures with identical sensitivity lists";
+  let description = [{
+    Merge multiple `always` procedures that share the same sensitivity list
+    and operate on disjoint slices of the same variables.
+  }];
+  let constructor = "circt::cfatrace::moore::createMergeProceduresPass()";
+}
+
+#endif // CIRCT_CFA_TRACE_DIALECT_MOORE_TRANSFORMS_PASSES
