@@ -14,8 +14,11 @@
 
 #include "circt-cfa-trace/Dialect/LLHD/Transforms/Passes.h"
 #include "circt-cfa-trace/Dialect/Moore/Transforms/Passes.h"
+#include "circt/Conversion/ExportVerilog.h"
+#include "circt/Conversion/HWToSV.h"
 #include "circt/Conversion/ImportVerilog.h"
 #include "circt/Conversion/MooreToCore.h"
+#include "circt/Conversion/SeqToSV.h"
 #include "circt/Dialect/Comb/CombDialect.h"
 #include "circt/Dialect/Debug/DebugDialect.h"
 #include "circt/Dialect/HW/HWDialect.h"
@@ -26,6 +29,8 @@
 #include "circt/Dialect/Moore/MoorePasses.h"
 #include "circt/Dialect/Seq/SeqDialect.h"
 #include "circt/Dialect/Seq/SeqPasses.h"
+#include "circt/Dialect/SV/SVDialect.h"
+#include "circt/Dialect/SV/SVPasses.h"
 #include "circt/Dialect/Verif/VerifDialect.h"
 #include "circt/Support/Passes.h"
 #include "circt/Support/Version.h"
@@ -71,6 +76,8 @@ enum class LoweringMode {
   OutputIRMoore,
   OutputIRLLHD,
   OutputIRHW,
+  OutputIRSV,
+  OutputSV,
   Full
 };
 
@@ -123,7 +130,12 @@ struct CLOptions {
               ", and emit the resulting LLHD+Core dialect IR"),
           clEnumValN(LoweringMode::OutputIRHW, "ir-hw",
                      "Run the MooreToCore conversion and emit the resulting "
-                     "core dialect IR")),
+                     "core dialect IR"),
+          clEnumValN(LoweringMode::OutputIRSV, "ir-sv",
+                     "Run the full lowering to SV dialect and emit the "
+                     "resulting SV dialect IR"),
+          clEnumValN(LoweringMode::OutputSV, "sv-sv",
+                     "Run the full lowering and emit SystemVerilog output")),
       cl::init(LoweringMode::Full), cl::cat(cat)};
 
   cl::opt<bool> debugInfo{"g", cl::desc("Generate debug information"),
@@ -138,6 +150,16 @@ struct CLOptions {
       "detect-memories",
       cl::desc("Detect memories and lower them to `seq.firmem`"),
       cl::init(true), cl::cat(cat)};
+
+  cl::opt<bool> splitVerilog{
+      "split-verilog",
+      cl::desc("Split output into one file per module (only for --sv-sv mode)"),
+      cl::init(false), cl::cat(cat)};
+
+  cl::opt<std::string> splitVerilogDir{
+      "split-verilog-dir",
+      cl::desc("Output directory for split verilog files (default: './')"),
+      cl::value_desc("directory"), cl::init("./"), cl::cat(cat)};
 
   //===--------------------------------------------------------------------===//
   // Include paths
@@ -394,6 +416,33 @@ static void populateLLHDLowering(PassManager &pm) {
   }
 }
 
+/// Lower HW dialect to SV dialect for Verilog emission.
+static void populateHWToSVLowering(PassManager &pm) {
+  // Lower FIR memory 
+  pm.addPass(createLowerFirMemPass());
+  
+  // Lower seq dialect to SV
+  pm.addPass(createLowerSeqToSVPass(LowerSeqToSVOptions{
+      /*disableMemRandomization=*/true,
+      /*disableRegRandomization=*/true}));
+  
+  // HW memory simulation
+  pm.addPass(seq::createHWMemSimImplPass(seq::HWMemSimImplOptions{
+      /*disableMemRandomization=*/true,
+      /*disableRegRandomization=*/true}));
+  
+  // Lower HW to SV
+  auto &modulePM = pm.nest<hw::HWModuleOp>();
+  modulePM.addPass(createLowerHWToSVPass());
+  
+  // Cleanup
+  modulePM.addPass(sv::createHWCleanupPass());
+  
+  // Final cleanup
+  pm.addPass(mlir::createCSEPass());
+  pm.addPass(mlir::createCanonicalizerPass());
+}
+
 /// Populate the given pass manager with transformations as configured by the
 /// command line options.
 static void populatePasses(PassManager &pm) {
@@ -404,6 +453,12 @@ static void populatePasses(PassManager &pm) {
   if (opts.loweringMode == LoweringMode::OutputIRLLHD)
     return;
   populateLLHDLowering(pm);
+  if (opts.loweringMode == LoweringMode::OutputIRHW)
+    return;
+  populateHWToSVLowering(pm);
+  if (opts.loweringMode == LoweringMode::OutputIRSV)
+    return;
+  // For OutputSV mode, we need to handle export in executeWithSources
 }
 
 //===----------------------------------------------------------------------===//
@@ -513,9 +568,29 @@ static LogicalResult executeWithSources(MLIRContext *context,
       return failure();
   }
 
-  // Print the final MLIR.
-  auto outputTimer = ts.nest("MLIR Printer");
-  module->print(outputFile->os());
+  // Handle output based on lowering mode
+  auto outputTimer = ts.nest("Output");
+  
+  if (opts.loweringMode == LoweringMode::OutputSV) {
+    // Export to SystemVerilog
+    if (opts.splitVerilog) {
+      // Split verilog output: one file per module
+      if (failed(exportSplitVerilog(module.get(), opts.splitVerilogDir))) {
+        WithColor::error() << "Failed to export split Verilog\n";
+        return failure();
+      }
+    } else {
+      // Single verilog output
+      if (failed(exportVerilog(module.get(), outputFile->os()))) {
+        WithColor::error() << "Failed to export Verilog\n";
+        return failure();
+      }
+    }
+  } else {
+    // Print the MLIR for all other modes
+    module->print(outputFile->os());
+  }
+  
   outputFile->keep();
   return success();
 }
@@ -627,6 +702,7 @@ int main(int argc, char **argv) {
     moore::MooreDialect,
     scf::SCFDialect,
     seq::SeqDialect,
+    sv::SVDialect,
     verif::VerifDialect,
     mlir::LLVM::LLVMDialect
   >();

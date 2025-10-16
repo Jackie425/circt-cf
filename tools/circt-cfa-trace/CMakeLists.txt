@@ -4,7 +4,9 @@ set(libs
   CIRCTCFATraceLLHDTransforms
   CIRCTComb
   CIRCTDebug
+  CIRCTExportVerilog
   CIRCTHW
+  CIRCTHWToSV
   CIRCTImportVerilog
   CIRCTLLHD
   CIRCTLLHDTransforms
@@ -12,7 +14,10 @@ set(libs
   CIRCTMooreToCore
   CIRCTMooreTransforms
   CIRCTSeq
+  CIRCTSeqToSV
   CIRCTSeqTransforms
+  CIRCTSV
+  CIRCTSVTransforms
   CIRCTSupport
   CIRCTTransforms
   CIRCTVerif

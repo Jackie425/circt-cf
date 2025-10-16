@@ -14,11 +14,14 @@ default: run
 
 run:
 	mkdir -p $(BUILD_DIR)
-	circt-cfa-trace --verbose-pass-executions $(DEBUG_OPTS) --ir-moore -C $(DESIGN).f -o $(BUILD_DIR)/$(DESIGN)_moore.mlir
+	circt-cfa-trace --mlir-pretty-debuginfo --verbose-pass-executions $(DEBUG_OPTS) --ir-moore -C $(DESIGN).f -o $(BUILD_DIR)/$(DESIGN)_moore.mlir
 	circt-cfa-trace --mlir-pretty-debuginfo --verbose-pass-executions $(DEBUG_OPTS) --ir-hw -C $(DESIGN).f -o $(BUILD_DIR)/$(DESIGN)_hw.mlir
-	circt-opt $(DEBUG_OPTS) \
-		'--pass-pipeline=builtin.module(lower-seq-firmem,lower-seq-to-sv{disable-mem-randomization disable-reg-randomization},hw-memory-sim{disable-mem-randomization disable-reg-randomization},hw.module(lower-hw-to-sv),test-apply-lowering-options{options=disallowLocalVariables},hw.module(hw-cleanup),export-split-verilog{dir-name=$(BUILD_DIR)/export-or1200-sv})' \
-		$(BUILD_DIR)/$(DESIGN)_hw.mlir -o $(BUILD_DIR)/$(DESIGN)_sv.mlir
+	circt-cfa-trace --mlir-pretty-debuginfo --verbose-pass-executions $(DEBUG_OPTS) --ir-sv -C $(DESIGN).f -o $(BUILD_DIR)/$(DESIGN)_sv.mlir
+	circt-cfa-trace --mlir-pretty-debuginfo --verbose-pass-executions $(DEBUG_OPTS) --sv-sv -C $(DESIGN).f -o $(BUILD_DIR)/$(DESIGN).sv
+
+run-split:
+	mkdir -p $(BUILD_DIR)/split-output
+	circt-cfa-trace --verbose-pass-executions $(DEBUG_OPTS) --sv-sv --split-verilog --split-verilog-dir=$(BUILD_DIR)/split-output -C $(DESIGN).f
 
 graph:
 	circt-opt --hw-print-instance-graph $(BUILD_DIR)/$(DESIGN)_hw.mlir 2> $(BUILD_DIR)/$(DESIGN)_hw.dot
