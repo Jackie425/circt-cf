@@ -1,5 +1,5 @@
-set(LLVM_TARGET_DEFINITIONS ${CMAKE_SOURCE_DIR}/include/circt-cfa-trace/Instrumentation/Transforms/Passes.td)
-mlir_tablegen(circt-cfa-trace/Instrumentation/Transforms/InstrumentationPasses.h.inc
+set(LLVM_TARGET_DEFINITIONS ${CMAKE_SOURCE_DIR}/include/circt-cfa-trace/Instrumentation/Passes.td)
+mlir_tablegen(circt-cfa-trace/Instrumentation/InstrumentationPasses.h.inc
   -gen-pass-decls -name Instrumentation)
 add_public_tablegen_target(CIRCTCFATraceInstrumentationPassIncGen)
 

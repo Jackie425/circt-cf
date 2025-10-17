@@ -1,5 +1,5 @@
-set(LLVM_TARGET_DEFINITIONS ${CMAKE_SOURCE_DIR}/include/circt-cfa-trace/Dialect/Moore/Transforms/Passes.td)
-mlir_tablegen(circt-cfa-trace/Dialect/Moore/Transforms/Passes.h.inc
+set(LLVM_TARGET_DEFINITIONS ${CMAKE_SOURCE_DIR}/include/circt-cfa-trace/Optimize/Moore/Passes.td)
+mlir_tablegen(circt-cfa-trace/Optimize/Moore/Passes.h.inc
   -gen-pass-decls)
 add_public_tablegen_target(CIRCTCFATraceMoorePassIncGen)
 

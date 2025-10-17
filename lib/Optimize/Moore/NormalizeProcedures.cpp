@@ -4,7 +4,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "circt-cfa-trace/Dialect/Moore/Transforms/Passes.h"
+#include "circt-cfa-trace/Optimize/Moore/Passes.h"
 
 #include "circt/Dialect/Moore/MooreOps.h"
 #include "mlir/IR/PatternMatch.h"
@@ -17,12 +17,12 @@ using namespace mlir;
 using namespace circt;
 using namespace ::circt::moore;
 
-namespace circt::cfatrace::moore {
+namespace circt::cfatrace::optimize::moore {
 #define GEN_PASS_DEF_NORMALIZEPROCEDURES
-#include "circt-cfa-trace/Dialect/Moore/Transforms/Passes.h.inc"
-} // namespace circt::cfatrace::moore
+#include "circt-cfa-trace/Optimize/Moore/Passes.h.inc"
+} // namespace circt::cfatrace::optimize::moore
 
-namespace circt::cfatrace::moore {
+namespace circt::cfatrace::optimize::moore {
 namespace {
 
 struct ReadAnalyzer {
@@ -187,4 +187,4 @@ std::unique_ptr<mlir::Pass> createNormalizeProceduresPass() {
   return std::make_unique<NormalizeProceduresPass>();
 }
 
-} // namespace circt::cfatrace::moore
+} // namespace circt::cfatrace::optimize::moore

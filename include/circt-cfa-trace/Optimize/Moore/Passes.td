@@ -1,11 +1,11 @@
-//===- Passes.td - Moore transform passes ----------------*- tablegen -*-===//
+//===- Passes.td - Moore optimization passes -------------*- tablegen -*-===//
 //
 // Part of the circt-cfa-trace project.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef CIRCT_CFA_TRACE_DIALECT_MOORE_TRANSFORMS_PASSES
-#define CIRCT_CFA_TRACE_DIALECT_MOORE_TRANSFORMS_PASSES
+#ifndef CIRCT_CFA_TRACE_OPTIMIZE_MOORE_PASSES
+#define CIRCT_CFA_TRACE_OPTIMIZE_MOORE_PASSES
 
 include "mlir/Pass/PassBase.td"
 
@@ -16,7 +16,8 @@ def NormalizeProcedures : Pass<"moore-normalize-procedures", "::circt::moore::SV
     lists (via wait_event) and converts them to `always_comb` when they represent
     pure combinational logic.
   }];
-  let constructor = "circt::cfatrace::moore::createNormalizeProceduresPass()";
+  let constructor =
+      "circt::cfatrace::optimize::moore::createNormalizeProceduresPass()";
 }
 
 def MergeProcedures : Pass<"moore-merge-procedures", "::circt::moore::SVModuleOp"> {
@@ -25,7 +26,8 @@ def MergeProcedures : Pass<"moore-merge-procedures", "::circt::moore::SVModuleOp
     Merge multiple `always` procedures that share the same sensitivity list
     and operate on disjoint slices of the same variables.
   }];
-  let constructor = "circt::cfatrace::moore::createMergeProceduresPass()";
+  let constructor =
+      "circt::cfatrace::optimize::moore::createMergeProceduresPass()";
 }
 
-#endif // CIRCT_CFA_TRACE_DIALECT_MOORE_TRANSFORMS_PASSES
+#endif // CIRCT_CFA_TRACE_OPTIMIZE_MOORE_PASSES

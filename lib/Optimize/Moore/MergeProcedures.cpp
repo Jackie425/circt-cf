@@ -4,7 +4,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "circt-cfa-trace/Dialect/Moore/Transforms/Passes.h"
+#include "circt-cfa-trace/Optimize/Moore/Passes.h"
 
 #include "circt/Dialect/Moore/MooreOps.h"
 #include "mlir/IR/IRMapping.h"
@@ -20,12 +20,12 @@ using namespace mlir;
 using namespace circt;
 using namespace ::circt::moore;
 
-namespace circt::cfatrace::moore {
+namespace circt::cfatrace::optimize::moore {
 #define GEN_PASS_DEF_MERGEPROCEDURES
-#include "circt-cfa-trace/Dialect/Moore/Transforms/Passes.h.inc"
-} // namespace circt::cfatrace::moore
+#include "circt-cfa-trace/Optimize/Moore/Passes.h.inc"
+} // namespace circt::cfatrace::optimize::moore
 
-namespace circt::cfatrace::moore {
+namespace circt::cfatrace::optimize::moore {
 namespace {
 
 /// Represents a write target (variable or bit range)
@@ -421,4 +421,4 @@ void registerMooreTransformPasses() {
   (void)initOnce;
 }
 
-} // namespace circt::cfatrace::moore
+} // namespace circt::cfatrace::optimize::moore

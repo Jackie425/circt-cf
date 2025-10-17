@@ -4,9 +4,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "circt-cfa-trace/Dialect/LLHD/Transforms/Passes.h"
-#include "circt-cfa-trace/Dialect/Moore/Transforms/Passes.h"
-#include "circt-cfa-trace/Instrumentation/Transforms/Passes.h"
+#include "circt-cfa-trace/Optimize/LLHD/Passes.h"
+#include "circt-cfa-trace/Optimize/Moore/Passes.h"
+#include "circt-cfa-trace/Instrumentation/Passes.h"
 #include "circt/InitAllDialects.h"
 #include "circt/Support/Version.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"

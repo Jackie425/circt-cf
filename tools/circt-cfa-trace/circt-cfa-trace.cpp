@@ -12,8 +12,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "circt-cfa-trace/Dialect/LLHD/Transforms/Passes.h"
-#include "circt-cfa-trace/Dialect/Moore/Transforms/Passes.h"
+#include "circt-cfa-trace/Optimize/LLHD/Passes.h"
+#include "circt-cfa-trace/Optimize/Moore/Passes.h"
 #include "circt/Conversion/ExportVerilog.h"
 #include "circt/Conversion/HWToSV.h"
 #include "circt/Conversion/ImportVerilog.h"
@@ -327,7 +327,8 @@ static void populateMooreTransforms(PassManager &pm) {
     auto &modulePM = pm.nest<moore::SVModuleOp>();
     modulePM.addPass(moore::createLowerConcatRefPass());
 
-    modulePM.addPass(circt::cfatrace::moore::createNormalizeProceduresPass());
+    modulePM.addPass(
+        circt::cfatrace::optimize::moore::createNormalizeProceduresPass());
 
     // Merge multiple always procedures with identical sensitivity lists that
     // write to non-overlapping variables or bit ranges. This reduces the
@@ -336,7 +337,8 @@ static void populateMooreTransforms(PassManager &pm) {
     //   always @(posedge clk) out[30:0] <= ...;
     //   always @(posedge clk) out[31] <= ...;
     // Will be merged into a single procedure that writes all bits of 'out'.
-    //modulePM.addPass(moore::createMergeProceduresPass());
+    // modulePM.addPass(
+    //     circt::cfatrace::optimize::moore::createMergeProceduresPass());
     
     // TODO: Enable the following once it not longer interferes with @(...)
     // event control checks. The introduced dummy variables make the event

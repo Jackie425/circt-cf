@@ -4,7 +4,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "circt-cfa-trace/Dialect/LLHD/Transforms/Passes.h"
+#include "circt-cfa-trace/Optimize/LLHD/Passes.h"
 
 #include "circt/Dialect/Comb/CombOps.h"
 #include "circt/Dialect/HW/HWOps.h"
@@ -24,16 +24,16 @@ using namespace ::circt::llhd;
 using namespace ::circt::hw;
 using namespace ::circt::seq;
 
-namespace circt::cfatrace::llhd {
+namespace circt::cfatrace::optimize::llhd {
 namespace cllhd = ::circt::llhd;
 namespace chw = ::circt::hw;
 namespace cseq = ::circt::seq;
 namespace ccomb = ::circt::comb;
 #define GEN_PASS_DEF_LLHDMEMTOFIRMEMPASS
-#include "circt-cfa-trace/Dialect/LLHD/Transforms/Passes.h.inc"
-} // namespace circt::cfatrace::llhd
+#include "circt-cfa-trace/Optimize/LLHD/Passes.h.inc"
+} // namespace circt::cfatrace::optimize::llhd
 
-namespace circt::cfatrace::llhd {
+namespace circt::cfatrace::optimize::llhd {
 namespace {
 
 struct PortInfo {
@@ -296,4 +296,4 @@ void registerLLHDTransformPasses() {
   (void)initOnce;
 }
 
-} // namespace circt::cfatrace::llhd
+} // namespace circt::cfatrace::optimize::llhd

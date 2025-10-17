@@ -4,10 +4,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "circt-cfa-trace/Instrumentation/Transforms/Passes.h"
+#include "circt-cfa-trace/Instrumentation/Passes.h"
 
 #define GEN_PASS_DEF_INSERTHWPROBE
-#include "circt-cfa-trace/Instrumentation/Transforms/InstrumentationPasses.h.inc"
+#include "circt-cfa-trace/Instrumentation/InstrumentationPasses.h.inc"
 
 #include "circt/Dialect/HW/HWOps.h"
 #include "mlir/IR/Builders.h"
