@@ -1,267 +1,119 @@
 # OR1200 Verilator Verification Environment
 
-Functional verification testbench for CIRCT-generated OR1200 SystemVerilog using Verilator simulation.
+Cycle-accurate Verilator test bench for the CIRCT-generated OR1200 core.  
+It compiles bare‑metal OR1K programs, loads them into a simple Harvard memory model, and traps software termination via a Wishbone write.
 
-## Overview
+---
 
-This verification environment validates the correctness of CIRCT source-to-source transformed OR1200 RTL by running real software workloads on a cycle-accurate Verilator model.
+## Requirements
 
-**Key Features:**
-- Harvard architecture with separate instruction/data memories (64KB each)
-- Automated software compilation and simulation
-- Program exit detection via magic values
-- Optional VCD waveform generation
-- Includes simple test and CoreMark benchmark
+- Verilator (v5.x recommended)
+- OR1K cross toolchain (`or1k-elf-gcc`, `or1k-elf-objcopy`, `or1k-elf-objdump`)
+- Python 3
+- GTKWave (optional, for viewing traces)
+
+Ensure all tools are on your `PATH` before running `make`.
+
+---
+
+## Directory Layout
+
+```
+verif/
+├── Makefile                  # Top-level build & run orchestration
+├── sim-main.cpp              # Verilator C++ harness (exit detection, tracing)
+├── tb/
+│   └── or1200_tb_top.sv      # SystemVerilog test bench (64 KiB IMEM/DMEM model)
+├── or1k-am/
+│   ├── crt0.S                # Startup + exit/abort handoff
+│   ├── or1200.ld             # Harvard-layout linker script (IMEM/DMEM @ 0)
+│   ├── program/              # Simple regression program
+│   └── coremark/             # CoreMark port with OR1K configuration
+├── scripts/
+│   └── hex_to_readmemh.py    # Converts objcopy VERILOG hex to $readmemh format
+└── build/                    # Generated IMEM/DMEM hex, VCD, Verilator obj_dir/
+```
+
+---
 
 ## Quick Start
 
-### Prerequisites
-- Verilator (v5.0+)
-- `or1k-elf-gcc` cross-compiler toolchain
-- Python 3 (for hex file conversion)
-- GTKWave (optional, for waveform viewing)
-
-### Basic Usage
-
 ```bash
-# Quick test with simple program (~6K cycles)
+# Build and run the default program (writes test data, exits cleanly)
 make
 
-# Run CoreMark benchmark without trace (~250M cycles, faster)
+# Run the CoreMark benchmark without waveform dumping
 make PROG=coremark TRACE=0
 
-# Run with waveform generation (slower, large VCD file)
-make PROG=coremark TRACE=1
+# Regenerate hex files only (no Verilator rebuild/run)
+make hex
 
-# View waveform
-make wave
+# Build the simulator executable without running it
+make sim
+
+# Clean generated program artifacts and simulator build
+make clean        # or clean-sim / clean-all
 ```
 
-## Directory Structure
+- `TRACE=1` (default) enables VCD dumping; `TRACE=0` disables tracing for speed.
+- The simulator binary is produced under `build/obj_dir/Vor1200_tb_top`.
+- Hex images appear in `build/<prog>_{imem,dmem}.hex`.
 
-```
-verif/or1200/
-├── Makefile              # Top-level build orchestration
-├── sim-main.cpp          # Verilator C++ testbench driver
-├── tb/
-│   └── or1200_tb_top.sv  # SystemVerilog testbench wrapper
-├── or1k-am/              # Software compilation environment
-│   ├── or1200.ld         # Linker script (Harvard architecture)
-│   ├── crt0.S            # Startup code (reset vector @ 0x100)
-│   ├── program/          # Simple test program
-│   │   ├── program.c     # Basic arithmetic test
-│   │   └── Makefile
-│   └── coremark/         # CoreMark embedded benchmark
-│       └── Makefile
-├── scripts/
-│   └── hex_to_readmemh.py  # Convert objcopy output to Verilog format
-└── build/                # Generated files (Verilator output, VCD, hex)
-```
+---
 
-**RTL Source:** `../../benchmark/or1200/build/or1200.sv` (CIRCT-generated)
+## Execution Flow
 
-## Memory Architecture
+1. `or1k-elf-gcc` compiles the selected program (`program` or `coremark`) using
+   the provided `crt0.S` and `or1200.ld`.
+2. `or1k-elf-objcopy` emits separate `.text` and `.data/.bss` Verilog hex files.
+3. `scripts/hex_to_readmemh.py` repacks those files into `$readmemh` format, one 32-bit word per line.
+4. Verilator builds and links `sim-main.cpp` with the OR1200 test bench and generated RTL.
+5. The harness toggles the clock, watches for Wishbone writes to `0xFFFF0000`, and exits with:
+   - `0xDEADBEEF` → program success (return code 0)
+   - `0xABADBABE` → abort/failure (return code 1)
 
-OR1200 uses **Harvard architecture** with separate instruction and data memory spaces:
+`crt0.S`’s `_exit` writes the success magic when `main` returns `0`; non-zero return values are routed through `abort`.
 
-```
-IMEM (Instruction Memory):  0x00000000 - 0x0000FFFF (64KB)
-  - .text section starts at 0x100 (CPU reset vector)
-  - .rodata (read-only data)
+---
 
-DMEM (Data Memory):         0x00000000 - 0x0000FFFF (64KB)
-  - .data section starts at 0x0
-  - .bss (uninitialized data)
-  - Stack grows from 0x10000 downward
-```
+## Useful Targets & Flags
 
-## Software Compilation Flow
+| Target / Flag           | Description                                                  |
+|-------------------------|--------------------------------------------------------------|
+| `run` (default)         | Build software, convert hex, build Verilator model, run once |
+| `hex`                   | Convert objcopy output to `$readmemh` only                   |
+| `sim`                   | Build the Verilator executable without running it           |
+| `info`                  | Print resolved paths and currently selected program         |
+| `dis`                   | Show disassembly via `less`                                 |
+| `wave`                  | Launch GTKWave on the latest trace (requires `TRACE=1`)      |
+| `clean`, `clean-sim`, `clean-all` | Remove software, simulator, or all build products |
+| `TRACE=0/1`             | Disable/enable VCD dumping                                   |
+| `PROG=program/coremark` | Select the software payload                                  |
 
-1. **Compile**: `or1k-elf-gcc` → ELF executable
-2. **Extract Sections**: `objcopy` → separate IMEM/DMEM raw binary + Intel hex
-3. **Convert Format**: `hex_to_readmemh.py` → Verilog `$readmemh` compatible
-4. **Load**: Testbench initializes memories from hex files
-
-### Simple Test Program
-Located in `or1k-am/program/program.c`:
-- Basic arithmetic operations (add, subtract, multiply)
-- Store results to memory addresses 0x0-0x6
-- Loop 100 iterations
-- **Runtime:** ~6,200 cycles (~62 μs @ 100MHz)
-
-### CoreMark Benchmark
-Located in `or1k-am/coremark/`:
-- Standard embedded performance benchmark
-- Tests: list processing, matrix operations, state machines, CRC
-- **Configuration:** ITERATIONS=1, PERFORMANCE_RUN=1
-- **Runtime:** ~250M cycles (~2.5 seconds @ 100MHz)
-
-## Exit Detection Mechanism
-
-Programs signal completion by writing magic values to address `0xFFFF0000`:
-
-| Value        | Meaning        | Exit Code |
-|--------------|----------------|-----------|
-| `0xDEADBEEF` | Success        | 0         |
-| `0xABADBABE` | Abort/Failure  | 1         |
-
-Example in C:
-```c
-volatile unsigned int *exit_signal = (volatile unsigned int *)0xFFFF0000;
-*exit_signal = 0xDEADBEEF;  // Signal success
-```
-
-
-## Makefile Targets
-
-| Target           | Description                                      |
-|------------------|--------------------------------------------------|
-| `make`           | Build and run simple program (default)           |
-| `make PROG=coremark` | Build and run CoreMark benchmark             |
-| `make TRACE=0`   | Disable VCD waveform (10x faster simulation)     |
-| `make build-program` | Compile simple program only                  |
-| `make build-coremark` | Compile CoreMark only                       |
-| `make sim`       | Build Verilator simulator only                   |
-| `make wave`      | Open VCD in GTKWave                              |
-| `make dis`       | Show disassembly of current program              |
-| `make clean`     | Clean build artifacts                            |
-| `make clean-all` | Clean everything including Verilator build       |
-| `make info`      | Show current configuration                       |
-| `make help`      | Display help message                             |
-
-## Trace Control
-
-The `TRACE` variable controls VCD waveform generation:
+To enable detailed bus logging during a manual run:
 
 ```bash
-# With trace (default) - slower, generates large VCD file
-make PROG=coremark TRACE=1
-
-# Without trace - 10x faster, no VCD file
-make PROG=coremark TRACE=0
+cd build/obj_dir
+./Vor1200_tb_top +tb_verbose
 ```
 
-**Performance Impact:**
-- With trace: ~1-2M cycles/second
-- Without trace: ~10-20M cycles/second
+---
 
-## Simulation Details
+## Test Bench Notes
 
-### Clock and Reset
-- **Clock Period:** 10ns (100 MHz)
-- **Reset Duration:** 5 clock cycles
-- **Reset Vector:** 0x100 (where `.text` section begins)
+- IMEM/DMEM depth: 64 KiB each (word-accessed via Wishbone).
+- No caches or wait-state modelling; every transaction completes in a single cycle.
+- Write strobes and partial writes are supported on DMEM.
+- Instruction fetch outside the 0x00000000–0x0000FFFF range defaults to `l.nop`.
 
-### Testbench Monitoring
-The C++ driver (`sim-main.cpp`) monitors:
-- Data Wishbone writes to `0xFFFF0000` for exit signals
-- Progress updates every 1,000 cycles
-- Maximum simulation time: 500M cycles (safety timeout)
+---
 
-### Wishbone Bus Protocol
-OR1200 uses Wishbone B3 Classic with single-cycle memory responses:
-- **IWB (Instruction Wishbone):** Read-only, fetches from IMEM
-- **DWB (Data Wishbone):** Read/write, accesses DMEM
+## Debug Tips
 
-## Debugging
+- Use `make dis PROG=<prog>` to inspect the generated assembly; check the tail of `main` to confirm it returns via `_exit`.
+- If the simulator reports an abort exit, verify your program does not return non-zero or explicitly call `abort()`.
+- When experimenting with different programs, ensure their data pointers do not alias the null address—`crt0.S` and the linker script expect IMEM/DMEM to start at 0, but the compiler must not see it as a null pointer.
 
-### View Waveform
-```bash
-make PROG=program TRACE=1
-make wave  # Opens GTKWave
-```
+---
 
-**Key Signals:**
-- `or1200_tb_top.iwb_*` - Instruction bus transactions
-- `or1200_tb_top.dwb_*` - Data bus transactions
-- `or1200_tb_top.or1200_inst.or1200_cpu.*` - CPU internals
-
-### View Disassembly
-```bash
-make dis PROG=program
-# or
-make dis PROG=coremark
-```
-
-### Check Program Memory Layout
-```bash
-or1k-elf-objdump -h or1k-am/coremark/build/coremark.elf
-or1k-elf-nm or1k-am/coremark/build/coremark.elf | sort
-```
-
-## Integration with CIRCT Pipeline
-
-This verification environment is part of the end-to-end CIRCT transformation flow:
-
-```
-1. Original RTL       → benchmark/or1200/or1200/rtl/*.v
-2. CIRCT Transform    → circt-cfa-trace (Moore → HW → SV dialects)
-3. Generated SV       → benchmark/or1200/build/or1200.sv
-4. Verification       → verif/or1200/ (this directory)
-```
-
-**Typical Workflow:**
-```bash
-# Step 1: Generate instrumented SV from original RTL
-cd ~/circt-cfa-trace/benchmark/or1200
-make run
-
-# Step 2: Verify functional correctness
-cd ~/circt-cfa-trace/verif/or1200
-make PROG=coremark TRACE=0
-```
-
-## Expected Results
-
-### Simple Program
-```
-Starting OR1200 simulation...
-[50] Reset released, processor starting...
-========================================
-PROGRAM COMPLETED SUCCESSFULLY
-========================================
-Exit signal detected at time 62070 (cycle 6207)
-Total cycles: 6207
-```
-
-### CoreMark (1 iteration)
-```
-Starting OR1200 simulation...
-[50] Reset released, processor starting...
-========================================
-PROGRAM COMPLETED SUCCESSFULLY
-========================================
-Exit signal detected at time ~2500000000 (cycle ~250000000)
-Total cycles: ~250000000
-CoreMark Score: ~0.4 CoreMark/MHz @ 100MHz
-```
-
-## Troubleshooting
-
-**Issue:** `No rule to make target '../../benchmark/or1200/build/or1200.sv'`
-- **Solution:** Run `make run` in `benchmark/or1200/` first to generate SV
-
-**Issue:** `or1k-elf-gcc: command not found`
-- **Solution:** Install OpenRISC toolchain or add to PATH
-
-**Issue:** Simulation timeout after 500M cycles
-- **Solution:** Check if program has infinite loop, review disassembly
-
-**Issue:** VCD file too large (>10GB)
-- **Solution:** Use `TRACE=0` or reduce `--trace-depth` in Makefile
-
-## Performance Notes
-
-- **CoreMark with TRACE=1:** ~2-3 hours real time for 250M cycles
-- **CoreMark with TRACE=0:** ~15-20 minutes real time for 250M cycles
-- **VCD file size (TRACE=1):** ~100MB per 1M cycles
-
-For CI/CD pipelines, use `TRACE=0` for faster validation.
-
-## References
-
-- [CIRCT Project](https://circt.llvm.org/)
-- [OpenRISC 1000 Architecture](https://openrisc.io/architecture)
-- [Verilator Documentation](https://verilator.org/guide/latest/)
-- [CoreMark Benchmark](https://www.eembc.org/coremark/)
-- [Wishbone B3 Specification](https://opencores.org/howto/wishbone)
+With these pieces, you can compile new OR1K workloads, run them under Verilator, and capture waveforms or disassembly as needed.

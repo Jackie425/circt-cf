@@ -7,7 +7,7 @@
 
 int main(void) {
     // Use volatile to prevent optimization
-    volatile int *memory = (volatile int *)0x0;
+    volatile int memory[6];
     
     // Use small values that fit in 16-bit signed range
     volatile int a = 0x1234;

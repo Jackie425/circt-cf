@@ -1,103 +1,82 @@
 #!/usr/bin/env python3
-"""
-hex_to_readmemh.py
+"""Convert objcopy Verilog hex output to $readmemh format."""
 
-Convert Intel HEX format (with byte addresses) to plain hex format 
-suitable for Verilog $readmemh system task (with word addresses).
+from __future__ import annotations
 
-Input format:
-    @00000100              <- byte address marker
-    18 20 00 00 A8 21 ...  <- space-separated hex bytes
+import argparse
+from pathlib import Path
 
-Output format:
-    @00000040              <- word address marker (byte_addr / 4)
-    18200000               <- 32-bit words (no spaces)
-    A8211000
-    ...
 
-Author: Generated for OR1200 Verilator testbench
-Date: 2025-10-18
-"""
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("input", type=Path, help="intel/objcopy style hex file")
+    parser.add_argument("output", type=Path, help="$readmemh compatible file")
+    return parser.parse_args()
 
-import sys
-import os
 
-def convert_intel_hex_to_readmemh(input_file, output_file):
-    
-    print(f"=== Intel HEX to $readmemh Converter ===")
-    print(f"Input:  {input_file}")
-    print(f"Output: {output_file}")
-    print()
-    
-    with open(input_file, 'r') as f:
-        lines = f.readlines()
-    
-    # Parse address offset
-    start_byte_addr = 0
-    words = []
-    
-    for line in lines:
-        line = line.strip()
+def collect_words(source: Path) -> dict[int, str]:
+    words: dict[int, str] = {}
+    byte_addr = 0
+    pending_bytes: list[str] = []
+
+    def flush_pending() -> None:
+        nonlocal byte_addr, pending_bytes
+        if not pending_bytes:
+            return
+        while len(pending_bytes) < 4:
+            pending_bytes.append("00")
+        word = "".join(pending_bytes).upper()
+        word_addr = byte_addr // 4
+        words[word_addr] = word
+        byte_addr += 4
+        pending_bytes.clear()
+
+    for raw_line in source.read_text().splitlines():
+        line = raw_line.strip()
         if not line:
             continue
-        
-        # Check for address marker
-        if line.startswith('@'):
-            start_byte_addr = int(line[1:], 16)
-            print(f"Start byte address: 0x{start_byte_addr:08x} ({start_byte_addr} bytes)")
-            continue
-        
-        # Remove spaces and parse hex bytes
-        bytes_str = line.replace(' ', '')
-        
-        # Convert to 32-bit words (big-endian)
-        for i in range(0, len(bytes_str), 8):  # 8 hex chars = 4 bytes = 32 bits
-            if i + 8 <= len(bytes_str):
-                word = bytes_str[i:i+8]
-                words.append(word)
-    
-    # Calculate word address (byte address / 4)
-    start_word_addr = start_byte_addr // 4
-    print(f"Start word address: 0x{start_word_addr:08x} ({start_word_addr} words)")
-    print(f"Total words: {len(words)}")
-    print()
-    
-    # Write to output
-    with open(output_file, 'w') as f:
-        # Write address marker for word address
-        f.write(f"@{start_word_addr:08x}\n")
-        
-        # Write words
-        for word in words:
-            f.write(f"{word}\n")
-    
-    print(f"✓ Successfully converted to: {output_file}")
-    print(f"\nFirst 5 words:")
-    for i, word in enumerate(words[:5]):
-        word_addr = start_word_addr + i
-        byte_addr = word_addr * 4
-        print(f"  imem[0x{word_addr:04x}] = 0x{word} (byte addr: 0x{byte_addr:08x})")
-    
-    if len(words) > 5:
-        print(f"  ... and {len(words) - 5} more words")
 
-if __name__ == '__main__':
-    if len(sys.argv) != 3:
-        print(f"Usage: {sys.argv[0]} <input_intel_hex> <output_readmemh_hex>")
-        print()
-        print("Example:")
-        print(f"  {sys.argv[0]} build/program.hex build/program.readmemh.hex")
-        sys.exit(1)
-    
-    input_file = sys.argv[1]
-    output_file = sys.argv[2]
-    
-    if not os.path.exists(input_file):
-        print(f"Error: Input file not found: {input_file}")
-        sys.exit(1)
-    
-    try:
-        convert_intel_hex_to_readmemh(input_file, output_file)
-    except Exception as e:
-        print(f"Error: {e}")
-        sys.exit(1)
+        if line.startswith("@"):
+            flush_pending()
+            byte_addr = int(line[1:], 16)
+            pending_bytes.clear()
+            continue
+
+        bytes_in_line = line.split()
+        if not bytes_in_line:
+            continue
+
+        pending_bytes.extend(bytes_in_line)
+        while len(pending_bytes) >= 4:
+            word_bytes = pending_bytes[:4]
+            pending_bytes = pending_bytes[4:]
+            word = "".join(word_bytes).upper()
+            if len(word) != 8:
+                raise ValueError(f"invalid word width at byte address 0x{byte_addr:08X}")
+            word_addr = byte_addr // 4
+            words[word_addr] = word
+            byte_addr += 4
+
+    flush_pending()
+
+    return words
+
+
+def write_readmemh(words: dict[int, str], destination: Path) -> None:
+    with destination.open("w", encoding="ascii") as fh:
+        previous_addr: int | None = None
+        for word_addr in sorted(words):
+            if previous_addr is None or word_addr != previous_addr + 1:
+                fh.write(f"@{word_addr:08X}\n")
+            fh.write(f"{words[word_addr]}\n")
+            previous_addr = word_addr
+
+
+def main() -> None:
+    args = parse_args()
+    words = collect_words(args.input)
+    write_readmemh(words, args.output)
+
+
+if __name__ == "__main__":
+    main()

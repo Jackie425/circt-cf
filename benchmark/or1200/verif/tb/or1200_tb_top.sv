@@ -6,6 +6,14 @@ module or1200_tb_top (
     input logic rst
 );
 
+    localparam bit TB_VERBOSE_DEFAULT = 1'b0;
+    bit verbose_enable;
+
+    initial begin
+        verbose_enable = TB_VERBOSE_DEFAULT;
+        if ($test$plusargs("tb_verbose"))
+            verbose_enable = 1'b1;
+    end
     // Internal signals
     logic [19:0] pic_ints;
     logic [1:0]  clmode;
@@ -76,23 +84,25 @@ module or1200_tb_top (
     end
     
     // Instruction Wishbone slave (memory model)
-    always_ff @(posedge clk or posedge rst) begin
-        if (rst) begin
-            iwb_ack <= 1'b0;
-            iwb_err <= 1'b0;
-            iwb_rty <= 1'b0;
-            iwb_dat_i <= 32'h0;
+    wire        iwb_req = iwb_cyc && iwb_stb;
+    wire [15:0] iwb_addr_hi = iwb_adr[31:16];
+    wire [13:0] iwb_word_idx = iwb_adr[15:2];
+    logic [31:0] imem_read_data;
+
+    always_comb begin
+        if (iwb_addr_hi == 16'h0000) begin
+            imem_read_data = imem[iwb_word_idx];
         end else begin
-            iwb_ack <= 1'b0;
-            iwb_err <= 1'b0;
-            iwb_rty <= 1'b0;
-            
-            if (iwb_cyc && iwb_stb && !iwb_ack) begin
-                // Read from instruction memory (64KB = 16384 words, need 14 bits)
-                iwb_dat_i <= imem[iwb_adr[13:2]];  // Word-aligned
-                iwb_ack <= 1'b1;
-            end
+            imem_read_data = 32'h15000000;  // default NOP on out-of-range fetch
         end
+    end
+
+    assign iwb_dat_i = imem_read_data;
+
+    always_comb begin
+        iwb_ack = iwb_req;
+        iwb_err = 1'b0;
+        iwb_rty = 1'b0;
     end
     
     // Simple data memory
@@ -110,46 +120,43 @@ module or1200_tb_top (
         $display("=== Loaded DMEM from: %s ===", `PROGRAM_DMEM_HEX);
 `endif
     end
-    
-    initial begin
-        for (int i = 0; i < 16384; i++) begin
-            dmem[i] = 32'h0;
-        end
-    end
+    // (second zeroing pass removed; initial block above already handles init)
     
     // Data Wishbone slave (memory model)
+    wire        dwb_req = dwb_cyc && dwb_stb;
+    wire [15:0] dwb_addr_hi = dwb_adr[31:16];
+    wire [13:0] dwb_word_idx = dwb_adr[15:2];
+    logic [31:0] dmem_read_data;
     logic [31:0] dmem_write_data;
-    logic [31:0] dmem_addr;
-    
+    wire         dmem_addr_valid = (dwb_addr_hi == 16'h0000);
+
     always_comb begin
-        dmem_write_data = dmem[dwb_adr[13:2]];  // 64KB addressing
+        if (dmem_addr_valid) begin
+            dmem_read_data = dmem[dwb_word_idx];
+        end else begin
+            dmem_read_data = 32'h00000000;
+        end
+
+        dmem_write_data = dmem_read_data;
         if (dwb_sel[0]) dmem_write_data[7:0]   = dwb_dat_o[7:0];
         if (dwb_sel[1]) dmem_write_data[15:8]  = dwb_dat_o[15:8];
         if (dwb_sel[2]) dmem_write_data[23:16] = dwb_dat_o[23:16];
         if (dwb_sel[3]) dmem_write_data[31:24] = dwb_dat_o[31:24];
     end
-    
+
+    assign dwb_dat_i = dmem_read_data;
+
+    always_comb begin
+        dwb_ack = dwb_req;
+        dwb_err = 1'b0;
+        dwb_rty = 1'b0;
+    end
+
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
-            dwb_ack <= 1'b0;
-            dwb_err <= 1'b0;
-            dwb_rty <= 1'b0;
-            dwb_dat_i <= 32'h0;
-        end else begin
-            dwb_ack <= 1'b0;
-            dwb_err <= 1'b0;
-            dwb_rty <= 1'b0;
-            
-            if (dwb_cyc && dwb_stb && !dwb_ack) begin
-                if (dwb_we) begin
-                    // Write to data memory (64KB addressing)
-                    dmem[dwb_adr[13:2]] <= dmem_write_data;
-                end else begin
-                    // Read from data memory (64KB addressing)
-                    dwb_dat_i <= dmem[dwb_adr[13:2]];
-                end
-                dwb_ack <= 1'b1;
-            end
+            // nothing to do, memories already initialised
+        end else if (dwb_req && dwb_we && dmem_addr_valid) begin
+            dmem[dwb_word_idx] <= dmem_write_data;
         end
     end
 
@@ -229,15 +236,15 @@ module or1200_tb_top (
             cycle_count <= cycle_count + 1;
             
             // Print instruction fetches
-            if (iwb_cyc && iwb_stb && iwb_ack) begin
-                $display("[%0t] Cycle %0d: IFETCH addr=0x%08h data=0x%08h", 
-                         $time, cycle_count, iwb_adr, iwb_dat_i);
+            if (verbose_enable && iwb_cyc && iwb_stb && iwb_ack) begin
+                  $display("[%0t] Cycle %0d: IFETCH addr=0x%08h data=0x%08h", 
+                          $time, cycle_count, iwb_adr, iwb_dat_i);
             end
             
             // Print data accesses
-            if (dwb_cyc && dwb_stb && dwb_ack) begin
-                if (dwb_we)
-                    $display("[%0t] Cycle %0d: DWRITE addr=0x%08h data=0x%08h sel=0x%h", 
+            if (verbose_enable && dwb_cyc && dwb_stb && dwb_ack) begin
+                 if (dwb_we)
+                     $display("[%0t] Cycle %0d: DWRITE addr=0x%08h data=0x%08h sel=0x%h", 
                              $time, cycle_count, dwb_adr, dwb_dat_o, dwb_sel);
                 else
                     $display("[%0t] Cycle %0d: DREAD  addr=0x%08h data=0x%08h", 

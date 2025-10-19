@@ -20,10 +20,10 @@ SECTIONS
     /* Code section - goes to instruction memory */
     .text 0x100 :
     {
-        *(.text.start)      /* Entry point first */
+        *(.text.start)
         *(.text)
         *(.text*)
-        *(.rodata)          /* Read-only data also in IMEM */
+        *(.rodata)
         *(.rodata*)
     } > IMEM
     
@@ -41,6 +41,12 @@ SECTIONS
         *(.bss*)
         *(COMMON)
     } > DMEM
+    
+    /* End of data/bss */
+    _end = .;
+    
+    /* Stack grows downward from top of DMEM */
+    _stack_top = ORIGIN(DMEM) + LENGTH(DMEM);  /* 0x10000 */
 }
 
 /* Define entry point */
