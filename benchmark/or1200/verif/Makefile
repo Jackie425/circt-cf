@@ -4,7 +4,7 @@
 
 .DEFAULT_GOAL := run
 .SUFFIXES:
-.PHONY: all run sim hex info dis wave clean clean-sim clean-all \
+.PHONY: all run sim info dis wave clean clean-sim clean-all \
         build-% format-help
 
 PROGS := program coremark
@@ -21,7 +21,6 @@ TRACE ?= 0
 ################################################################################
 
 VERILATOR ?= verilator
-PYTHON    ?= python3
 GTKWAVE   ?= gtkwave
 
 ################################################################################
@@ -32,25 +31,19 @@ ROOT_DIR       := $(CURDIR)
 OR1K_DIR       := or1k-am
 BUILD_DIR      := build
 OBJ_DIR        := $(BUILD_DIR)/obj_dir
-SCRIPTS_DIR    := scripts
 TB_DIR         := tb
 
 PROG_DIR       := $(OR1K_DIR)/$(PROG)
 PROG_BUILD_DIR := $(PROG_DIR)/build
 PROG_ELF       := $(PROG_BUILD_DIR)/$(PROG).elf
-PROG_IMEM_HEX  := $(PROG_BUILD_DIR)/$(PROG)_imem.hex
-PROG_DMEM_HEX  := $(PROG_BUILD_DIR)/$(PROG)_dmem.hex
+PROG_ELF_ABS   := $(abspath $(PROG_ELF))
 PROG_DIS       := $(PROG_BUILD_DIR)/$(PROG).dis
 
-BUILD_IMEM_HEX := $(BUILD_DIR)/$(PROG)_imem.hex
-BUILD_DMEM_HEX := $(BUILD_DIR)/$(PROG)_dmem.hex
 TRACE_FILE     := $(BUILD_DIR)/or1200_trace.vcd
 
 RTL_SOURCES := ../build/or1200.sv $(TB_DIR)/or1200_tb_top.sv
 CPP_SOURCES := sim-main.cpp
 SIM_EXE     := $(OBJ_DIR)/Vor1200_tb_top
-
-HEX_CONVERTER := $(SCRIPTS_DIR)/hex_to_readmemh.py
 
 ################################################################################
 # Verilator flags
@@ -78,8 +71,7 @@ VERILATOR_FLAGS := \
 	--top-module or1200_tb_top \
 	-Mdir $(OBJ_DIR) \
 	-CFLAGS -I$(ROOT_DIR) \
-	-DPROGRAM_IMEM_HEX=\"../$(PROG)_imem.hex\" \
-	-DPROGRAM_DMEM_HEX=\"../$(PROG)_dmem.hex\"
+	-CFLAGS -DPROGRAM_ELF=\"$(PROG_ELF_ABS)\"
 
 ifeq ($(TRACE),1)
 VERILATOR_FLAGS += --trace --trace-depth 10 --trace-structs --trace-max-array 1024
@@ -103,14 +95,10 @@ endif
 
 sim: $(SIM_EXE)
 
-hex: $(BUILD_IMEM_HEX) $(BUILD_DMEM_HEX)
-
 info:
 	@printf "Program      : %s\n" "$(PROG)"
 	@printf "Trace        : %s\n" "$(TRACE)"
 	@printf "ELF          : %s\n" "$(PROG_ELF)"
-	@printf "IMEM hex     : %s\n" "$(BUILD_IMEM_HEX)"
-	@printf "DMEM hex     : %s\n" "$(BUILD_DMEM_HEX)"
 	@printf "Simulator    : %s\n" "$(SIM_EXE)"
 
 dis: $(PROG_DIS)
@@ -127,7 +115,7 @@ wave:
 clean:
 	@$(MAKE) -C $(OR1K_DIR)/program clean
 	@$(MAKE) -C $(OR1K_DIR)/coremark clean
-	@rm -f $(BUILD_DIR)/*_imem.hex $(BUILD_DIR)/*_dmem.hex $(TRACE_FILE)
+	@rm -f $(TRACE_FILE)
 
 clean-sim:
 	@rm -rf $(OBJ_DIR)
@@ -139,7 +127,7 @@ clean-all: clean clean-sim
 # Build graph
 ################################################################################
 
-$(SIM_EXE): $(RTL_SOURCES) $(CPP_SOURCES) $(BUILD_IMEM_HEX) $(BUILD_DMEM_HEX) | $(OBJ_DIR)
+$(SIM_EXE): $(RTL_SOURCES) $(CPP_SOURCES) $(PROG_ELF) | $(OBJ_DIR)
 	@$(VERILATOR) $(VERILATOR_FLAGS) $(RTL_SOURCES) $(abspath $(CPP_SOURCES))
 
 $(OBJ_DIR):
@@ -148,17 +136,7 @@ $(OBJ_DIR):
 $(BUILD_DIR):
 	@mkdir -p $(BUILD_DIR)
 
-$(BUILD_IMEM_HEX): $(PROG_IMEM_HEX) | $(BUILD_DIR)
-	@$(PYTHON) $(HEX_CONVERTER) $< $@
-
-$(BUILD_DMEM_HEX): $(PROG_DMEM_HEX) | $(BUILD_DIR)
-	@if [ -s $< ]; then \
-		$(PYTHON) $(HEX_CONVERTER) $< $@; \
-	else \
-		printf "@00000000\n" > $@; \
-	fi
-
-$(PROG_IMEM_HEX) $(PROG_DMEM_HEX) $(PROG_DIS): | $(PROG_DIR)
+$(PROG_ELF) $(PROG_DIS): | $(PROG_DIR)
 	@$(MAKE) -C $(PROG_DIR)
 
 $(PROG_DIR):
@@ -173,9 +151,8 @@ build-%:
 
 format-help:
 	@printf "Targets:\n"
-	@printf "  run (default)  - build SW, convert hex, build Verilator model, run\n"
+	@printf "  run (default)  - build SW ELF, build Verilator model, run\n"
 	@printf "  sim            - build Verilator model\n"
-	@printf "  hex            - convert objcopy output to $readmemh format\n"
 	@printf "  info           - print resolved paths\n"
 	@printf "  dis            - open disassembly for current program\n"
 	@printf "  wave           - open GTKWave on latest trace\n"

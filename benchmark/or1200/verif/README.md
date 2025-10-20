@@ -9,7 +9,6 @@ It compiles bare‑metal OR1K programs, loads them into a simple Harvard memory 
 
 - Verilator (v5.x recommended)
 - OR1K cross toolchain (`or1k-elf-gcc`, `or1k-elf-objcopy`, `or1k-elf-objdump`)
-- Python 3
 - GTKWave (optional, for viewing traces)
 
 Ensure all tools are on your `PATH` before running `make`.
@@ -29,9 +28,7 @@ verif/
 │   ├── or1200.ld             # Harvard-layout linker script (IMEM/DMEM @ 0)
 │   ├── program/              # Simple regression program
 │   └── coremark/             # CoreMark port with OR1K configuration
-├── scripts/
-│   └── hex_to_readmemh.py    # Converts objcopy VERILOG hex to $readmemh format
-└── build/                    # Generated IMEM/DMEM hex, VCD, Verilator obj_dir/
+└── build/                    # Verilator obj_dir/ and optional waveform dumps
 ```
 
 ---
@@ -45,9 +42,6 @@ make
 # Run the CoreMark benchmark without waveform dumping
 make PROG=coremark TRACE=0
 
-# Regenerate hex files only (no Verilator rebuild/run)
-make hex
-
 # Build the simulator executable without running it
 make sim
 
@@ -57,18 +51,18 @@ make clean        # or clean-sim / clean-all
 
 - `TRACE=1` (default) enables VCD dumping; `TRACE=0` disables tracing for speed.
 - The simulator binary is produced under `build/obj_dir/Vor1200_tb_top`.
-- Hex images appear in `build/<prog>_{imem,dmem}.hex`.
+- Software ELFs live under `or1k-am/<prog>/build/<prog>.elf` and are loaded directly by the simulator.
 
 ---
 
 ## Execution Flow
 
 1. `or1k-elf-gcc` compiles the selected program (`program` or `coremark`) using
-   the provided `crt0.S` and `or1200.ld`.
-2. `or1k-elf-objcopy` emits separate `.text` and `.data/.bss` Verilog hex files.
-3. `scripts/hex_to_readmemh.py` repacks those files into `$readmemh` format, one 32-bit word per line.
-4. Verilator builds and links `sim-main.cpp` with the OR1200 test bench and generated RTL.
-5. The harness toggles the clock, watches for Wishbone writes to `0xFFFF0000`, and exits with:
+   the provided `crt0.S` and `or1200.ld`, producing a standalone ELF binary.
+2. Verilator builds and links `sim-main.cpp` with the OR1200 test bench and generated RTL.
+3. During reset, the C++ harness parses the ELF, loads executable segments into IMEM, and
+   writes writable segments into DMEM (zero-filling `.bss`).
+4. The harness toggles the clock, watches for Wishbone writes to `0xFFFF0000`, and exits with:
    - `0xDEADBEEF` → program success (return code 0)
    - `0xABADBABE` → abort/failure (return code 1)
 
@@ -80,8 +74,7 @@ make clean        # or clean-sim / clean-all
 
 | Target / Flag           | Description                                                  |
 |-------------------------|--------------------------------------------------------------|
-| `run` (default)         | Build software, convert hex, build Verilator model, run once |
-| `hex`                   | Convert objcopy output to `$readmemh` only                   |
+| `run` (default)         | Build software ELF, build Verilator model, run once         |
 | `sim`                   | Build the Verilator executable without running it           |
 | `info`                  | Print resolved paths and currently selected program         |
 | `dis`                   | Show disassembly via `less`                                 |

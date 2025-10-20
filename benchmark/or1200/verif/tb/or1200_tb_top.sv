@@ -67,7 +67,7 @@ module or1200_tb_top (
     end
 
     // Simple instruction memory (initialized with NOP instructions)
-    logic [31:0] imem [0:16383];  // 64KB = 16384 words
+    logic [31:0] imem [0:16383] /* verilator public_flat */;  // 64KB = 16384 words
     
     initial begin
         // Initialize all memory with NOP instructions (l.nop 0x0)
@@ -75,12 +75,6 @@ module or1200_tb_top (
         for (int i = 0; i < 16384; i++) begin
             imem[i] = 32'h15000000;
         end
-        
-`ifdef PROGRAM_IMEM_HEX
-        // Load instruction memory from hex file
-        $readmemh(`PROGRAM_IMEM_HEX, imem);
-        $display("=== Loaded IMEM from: %s ===", `PROGRAM_IMEM_HEX);
-`endif
     end
     
     // Instruction Wishbone slave (memory model)
@@ -106,19 +100,13 @@ module or1200_tb_top (
     end
     
     // Simple data memory
-    logic [31:0] dmem [0:16383];  // 64KB = 16384 words
+    logic [31:0] dmem [0:16383] /* verilator public_flat */;  // 64KB = 16384 words
     
     initial begin
         // Initialize all data memory to zero
         for (int i = 0; i < 16384; i++) begin
             dmem[i] = 32'h00000000;
         end
-        
-`ifdef PROGRAM_DMEM_HEX
-        // Load data memory from hex file
-        $readmemh(`PROGRAM_DMEM_HEX, dmem);
-        $display("=== Loaded DMEM from: %s ===", `PROGRAM_DMEM_HEX);
-`endif
     end
     // (second zeroing pass removed; initial block above already handles init)
     
