@@ -1,14 +1,14 @@
-set(LLVM_TARGET_DEFINITIONS ${CMAKE_SOURCE_DIR}/include/circt-cfa-trace/Optimize/Moore/Passes.td)
-mlir_tablegen(circt-cfa-trace/Optimize/Moore/Passes.h.inc
+set(LLVM_TARGET_DEFINITIONS ${CMAKE_SOURCE_DIR}/include/circt-cf/Optimize/Moore/Passes.td)
+mlir_tablegen(circt-cf/Optimize/Moore/Passes.h.inc
   -gen-pass-decls)
-add_public_tablegen_target(CIRCTCFATraceMoorePassIncGen)
+add_public_tablegen_target(CIRCTCFMoorePassIncGen)
 
-add_circt_library(CIRCTCFATraceMooreTransforms
+add_circt_library(CIRCTCFMooreTransforms
   MergeProcedures.cpp
   NormalizeProcedures.cpp
 
   DEPENDS
-  CIRCTCFATraceMoorePassIncGen
+  CIRCTCFMoorePassIncGen
 
   LINK_LIBS PUBLIC
   CIRCTMoore

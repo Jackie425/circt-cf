@@ -1,7 +1,7 @@
 set(libs
-  CIRCTCFATraceInstrumentation
-  CIRCTCFATraceMooreTransforms
-  CIRCTCFATraceLLHDTransforms
+  CIRCTCFInstrumentation
+  CIRCTCFMooreTransforms
+  CIRCTCFLLHDTransforms
   CIRCTComb
   CIRCTDebug
   CIRCTExportVerilog
@@ -32,8 +32,8 @@ set(libs
   MLIRLLVMIRTransforms
   )
 
-add_circt_tool(circt-cfa-trace circt-cfa-trace.cpp DEPENDS ${libs})
-target_link_libraries(circt-cfa-trace PRIVATE ${libs})
+add_circt_tool(circt-cf circt-cf.cpp DEPENDS ${libs})
+target_link_libraries(circt-cf PRIVATE ${libs})
 
-llvm_update_compile_flags(circt-cfa-trace)
-mlir_check_all_link_libraries(circt-cfa-trace)
+llvm_update_compile_flags(circt-cf)
+mlir_check_all_link_libraries(circt-cf)

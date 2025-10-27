@@ -1,11 +1,11 @@
 //===- InstrumentationPasses.td - Pass definitions --------------*- tablegen -*-===//
 //
-// Part of the circt-cfa-trace project.
+// Part of the circt-cf project.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef CIRCT_CFA_TRACE_INSTRUMENTATION_PASSES
-#define CIRCT_CFA_TRACE_INSTRUMENTATION_PASSES
+#ifndef CIRCT_CF_INSTRUMENTATION_PASSES
+#define CIRCT_CF_INSTRUMENTATION_PASSES
 
 include "mlir/Pass/PassBase.td"
 
@@ -20,4 +20,4 @@ def InsertHWProbe : Pass<"insert-hw-probes", "::mlir::ModuleOp"> {
   let dependentDialects = ["circt::hw::HWDialect"];
 }
 
-#endif // CIRCT_CFA_TRACE_INSTRUMENTATION_PASSES
+#endif // CIRCT_CF_INSTRUMENTATION_PASSES

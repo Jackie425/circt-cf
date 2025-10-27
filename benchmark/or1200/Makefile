@@ -14,14 +14,14 @@ default: run
 
 run:
 	mkdir -p $(BUILD_DIR)
-	circt-cfa-trace --mlir-pretty-debuginfo --verbose-pass-executions $(DEBUG_OPTS) --ir-moore -C $(DESIGN).f -o $(BUILD_DIR)/$(DESIGN)_moore.mlir
-	circt-cfa-trace --mlir-pretty-debuginfo --verbose-pass-executions $(DEBUG_OPTS) --ir-hw -C $(DESIGN).f -o $(BUILD_DIR)/$(DESIGN)_hw.mlir
-	circt-cfa-trace --mlir-pretty-debuginfo --verbose-pass-executions $(DEBUG_OPTS) --ir-sv -C $(DESIGN).f -o $(BUILD_DIR)/$(DESIGN)_sv.mlir
-	circt-cfa-trace --mlir-pretty-debuginfo --verbose-pass-executions $(DEBUG_OPTS) --sv-sv -C $(DESIGN).f -o $(BUILD_DIR)/$(DESIGN).sv
+	circt-cf --mlir-pretty-debuginfo --verbose-pass-executions $(DEBUG_OPTS) --ir-moore -C $(DESIGN).f -o $(BUILD_DIR)/$(DESIGN)_moore.mlir
+	circt-cf --mlir-pretty-debuginfo --verbose-pass-executions $(DEBUG_OPTS) --ir-hw -C $(DESIGN).f -o $(BUILD_DIR)/$(DESIGN)_hw.mlir
+	circt-cf --mlir-pretty-debuginfo --verbose-pass-executions $(DEBUG_OPTS) --ir-sv -C $(DESIGN).f -o $(BUILD_DIR)/$(DESIGN)_sv.mlir
+	circt-cf --mlir-pretty-debuginfo --verbose-pass-executions $(DEBUG_OPTS) --sv-sv -C $(DESIGN).f -o $(BUILD_DIR)/$(DESIGN).sv
 
 run-split:
 	mkdir -p $(BUILD_DIR)/split-output
-	circt-cfa-trace --verbose-pass-executions $(DEBUG_OPTS) --sv-sv --split-verilog --split-verilog-dir=$(BUILD_DIR)/split-output -C $(DESIGN).f
+	circt-cf --verbose-pass-executions $(DEBUG_OPTS) --sv-sv --split-verilog --split-verilog-dir=$(BUILD_DIR)/split-output -C $(DESIGN).f
 
 graph:
 	circt-opt --hw-print-instance-graph $(BUILD_DIR)/$(DESIGN)_hw.mlir 2> $(BUILD_DIR)/$(DESIGN)_hw.dot

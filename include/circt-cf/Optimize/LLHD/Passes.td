@@ -1,11 +1,11 @@
 //===- Passes.td - LLHD optimization passes --------------*- tablegen -*-===//
 //
-// Part of the circt-cfa-trace project.
+// Part of the circt-cf project.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef CIRCT_CFA_TRACE_OPTIMIZE_LLHD_PASSES
-#define CIRCT_CFA_TRACE_OPTIMIZE_LLHD_PASSES
+#ifndef CIRCT_CF_OPTIMIZE_LLHD_PASSES
+#define CIRCT_CF_OPTIMIZE_LLHD_PASSES
 
 include "mlir/Pass/PassBase.td"
 
@@ -19,4 +19,4 @@ def LLHDMemToFirMemPass : Pass<"llhd-mem-to-firmem", "::circt::hw::HWModuleOp"> 
       "circt::cfatrace::optimize::llhd::createLLHDMemToFirMemPass()";
 }
 
-#endif // CIRCT_CFA_TRACE_OPTIMIZE_LLHD_PASSES
+#endif // CIRCT_CF_OPTIMIZE_LLHD_PASSES

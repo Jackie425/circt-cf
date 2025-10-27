@@ -1,4 +1,4 @@
-// RUN: %circt-cfa-trace-opt --insert-hw-probes %s | FileCheck %s
+// RUN: %circt-cf-opt --insert-hw-probes %s | FileCheck %s
 
 hw.module @Foo() {
   hw.output

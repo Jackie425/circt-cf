@@ -1,11 +1,11 @@
 //===- Passes.td - Moore optimization passes -------------*- tablegen -*-===//
 //
-// Part of the circt-cfa-trace project.
+// Part of the circt-cf project.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef CIRCT_CFA_TRACE_OPTIMIZE_MOORE_PASSES
-#define CIRCT_CFA_TRACE_OPTIMIZE_MOORE_PASSES
+#ifndef CIRCT_CF_OPTIMIZE_MOORE_PASSES
+#define CIRCT_CF_OPTIMIZE_MOORE_PASSES
 
 include "mlir/Pass/PassBase.td"
 
@@ -30,4 +30,4 @@ def MergeProcedures : Pass<"moore-merge-procedures", "::circt::moore::SVModuleOp
       "circt::cfatrace::optimize::moore::createMergeProceduresPass()";
 }
 
-#endif // CIRCT_CFA_TRACE_OPTIMIZE_MOORE_PASSES
+#endif // CIRCT_CF_OPTIMIZE_MOORE_PASSES

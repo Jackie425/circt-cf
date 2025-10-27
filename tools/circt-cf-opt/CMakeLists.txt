@@ -7,13 +7,13 @@ set(LLVM_LINK_COMPONENTS
   Support
 )
 
-add_circt_tool(circt-cfa-trace-opt
-  circt-cfa-trace-opt.cpp
+add_circt_tool(circt-cf-opt
+  circt-cf-opt.cpp
 )
 
-llvm_update_compile_flags(circt-cfa-trace-opt)
+llvm_update_compile_flags(circt-cf-opt)
 
-target_link_libraries(circt-cfa-trace-opt
+target_link_libraries(circt-cf-opt
   PRIVATE
   # Link all CIRCT dialects and conversions automatically
   ${dialect_libs}
@@ -24,9 +24,9 @@ target_link_libraries(circt-cfa-trace-opt
   CIRCTTransforms
   
   # Your custom libraries
-  CIRCTCFATraceLLHDTransforms
-  CIRCTCFATraceMooreTransforms
-  CIRCTCFATraceInstrumentation
+  CIRCTCFLLHDTransforms
+  CIRCTCFMooreTransforms
+  CIRCTCFInstrumentation
   
   # MLIR libraries
   MLIRAffineDialect

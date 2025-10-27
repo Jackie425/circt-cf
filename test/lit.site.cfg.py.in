@@ -1,7 +1,7 @@
 @LIT_SITE_CFG_IN_HEADER@
 
-config.circt_cfa_trace_obj_root = "@CMAKE_BINARY_DIR@/test"
-config.circt_cfa_trace_tools_dir = "@LLVM_RUNTIME_OUTPUT_INTDIR@"
+config.circt_cf_obj_root = "@CMAKE_BINARY_DIR@/test"
+config.circt_cf_tools_dir = "@LLVM_RUNTIME_OUTPUT_INTDIR@"
 config.llvm_tools_dir = "@LLVM_TOOLS_BINARY_DIR@"
 config.mlir_tools_dir = "@MLIR_TOOLS_DIR@"
 config.target_triple = "@LLVM_DEFAULT_TARGET_TRIPLE@"

@@ -1,6 +1,6 @@
 //===- Passes.h - Instrumentation pass entry points -------------*- C++ -*-===//
 //
-// Part of the circt-cfa-trace project.
+// Part of the circt-cf project.
 //
 //===----------------------------------------------------------------------===//
 //
@@ -8,8 +8,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef CIRCT_CFA_TRACE_INSTRUMENTATION_PASSES_H
-#define CIRCT_CFA_TRACE_INSTRUMENTATION_PASSES_H
+#ifndef CIRCT_CF_INSTRUMENTATION_PASSES_H
+#define CIRCT_CF_INSTRUMENTATION_PASSES_H
 
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
@@ -22,7 +22,7 @@ class HWDialect;
 namespace cfatrace {
 
 #define GEN_PASS_DECL
-#include "circt-cfa-trace/Instrumentation/InstrumentationPasses.h.inc"
+#include "circt-cf/Instrumentation/InstrumentationPasses.h.inc"
 
 std::unique_ptr<mlir::Pass> createInsertHWProbePass();
 void registerInsertHWProbePasses();
@@ -30,4 +30,4 @@ void registerInsertHWProbePasses();
 } // namespace cfatrace
 } // namespace circt
 
-#endif // CIRCT_CFA_TRACE_INSTRUMENTATION_PASSES_H
+#endif // CIRCT_CF_INSTRUMENTATION_PASSES_H

@@ -1,10 +1,10 @@
 //===- NormalizeProcedures.cpp - Normalize Moore Procedures ----*- C++ -*-===//
 //
-// Part of the circt-cfa-trace project.
+// Part of the circt-cf project.
 //
 //===----------------------------------------------------------------------===//
 
-#include "circt-cfa-trace/Optimize/Moore/Passes.h"
+#include "circt-cf/Optimize/Moore/Passes.h"
 
 #include "circt/Dialect/Moore/MooreOps.h"
 #include "mlir/IR/PatternMatch.h"
@@ -19,7 +19,7 @@ using namespace ::circt::moore;
 
 namespace circt::cfatrace::optimize::moore {
 #define GEN_PASS_DEF_NORMALIZEPROCEDURES
-#include "circt-cfa-trace/Optimize/Moore/Passes.h.inc"
+#include "circt-cf/Optimize/Moore/Passes.h.inc"
 } // namespace circt::cfatrace::optimize::moore
 
 namespace circt::cfatrace::optimize::moore {

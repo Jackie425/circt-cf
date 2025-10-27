@@ -1,4 +1,4 @@
-//===- circt-cfa-trace.cpp - Getting Verilog into CIRCT ------------------===//
+//===- circt-cf.cpp - Getting Verilog into CIRCT ------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -12,8 +12,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "circt-cfa-trace/Optimize/LLHD/Passes.h"
-#include "circt-cfa-trace/Optimize/Moore/Passes.h"
+#include "circt-cf/Optimize/LLHD/Passes.h"
+#include "circt-cf/Optimize/Moore/Passes.h"
 #include "circt/Conversion/ExportVerilog.h"
 #include "circt/Conversion/HWToSV.h"
 #include "circt/Conversion/ImportVerilog.h"
@@ -562,7 +562,7 @@ static LogicalResult executeWithSources(MLIRContext *context,
     if (opts.verbosePassExecutions)
       pm.addInstrumentation(
           std::make_unique<VerbosePassInstrumentation<mlir::ModuleOp>>(
-              "circt-cfa-trace"));
+              "circt-cf"));
     if (failed(applyPassManagerCLOptions(pm)))
       return failure();
     populatePasses(pm);
@@ -689,7 +689,7 @@ int main(int argc, char **argv) {
 
   // Parse pass names in main to ensure static initialization completed.
   cl::ParseCommandLineOptions(argc, argv,
-                              "circt-cfa-trace: Verilog and SystemVerilog frontend\n");
+                              "circt-cf: Verilog and SystemVerilog frontend\n");
 
   // Register the dialects.
   // clang-format off

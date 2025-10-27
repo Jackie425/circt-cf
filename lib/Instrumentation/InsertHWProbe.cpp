@@ -1,13 +1,13 @@
 //===- InstrumentationPass.cpp - Basic instrumentation pass ---------------===//
 //
-// Part of the circt-cfa-trace project.
+// Part of the circt-cf project.
 //
 //===----------------------------------------------------------------------===//
 
-#include "circt-cfa-trace/Instrumentation/Passes.h"
+#include "circt-cf/Instrumentation/Passes.h"
 
 #define GEN_PASS_DEF_INSERTHWPROBE
-#include "circt-cfa-trace/Instrumentation/InstrumentationPasses.h.inc"
+#include "circt-cf/Instrumentation/InstrumentationPasses.h.inc"
 
 #include "circt/Dialect/HW/HWOps.h"
 #include "mlir/IR/Builders.h"

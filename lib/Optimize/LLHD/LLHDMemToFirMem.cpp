@@ -1,10 +1,10 @@
 //===- LLHDMemToFirMem.cpp - Convert LLHD Memories to FirMem -------------===//
 //
-// Part of the circt-cfa-trace project.
+// Part of the circt-cf project.
 //
 //===----------------------------------------------------------------------===//
 
-#include "circt-cfa-trace/Optimize/LLHD/Passes.h"
+#include "circt-cf/Optimize/LLHD/Passes.h"
 
 #include "circt/Dialect/Comb/CombOps.h"
 #include "circt/Dialect/HW/HWOps.h"
@@ -30,7 +30,7 @@ namespace chw = ::circt::hw;
 namespace cseq = ::circt::seq;
 namespace ccomb = ::circt::comb;
 #define GEN_PASS_DEF_LLHDMEMTOFIRMEMPASS
-#include "circt-cfa-trace/Optimize/LLHD/Passes.h.inc"
+#include "circt-cf/Optimize/LLHD/Passes.h.inc"
 } // namespace circt::cfatrace::optimize::llhd
 
 namespace circt::cfatrace::optimize::llhd {

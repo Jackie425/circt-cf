@@ -1,12 +1,12 @@
-//===- circt-cfa-trace-opt.cpp - The circt-cfa-trace-opt driver ----------===//
+//===- circt-cf-opt.cpp - The circt-cf-opt driver ----------===//
 //
 // CFA Trace optimizer driver for testing passes
 //
 //===----------------------------------------------------------------------===//
 
-#include "circt-cfa-trace/Optimize/LLHD/Passes.h"
-#include "circt-cfa-trace/Optimize/Moore/Passes.h"
-#include "circt-cfa-trace/Instrumentation/Passes.h"
+#include "circt-cf/Optimize/LLHD/Passes.h"
+#include "circt-cf/Optimize/Moore/Passes.h"
+#include "circt-cf/Instrumentation/Passes.h"
 #include "circt/InitAllDialects.h"
 #include "circt/Support/Version.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"

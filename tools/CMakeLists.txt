@@ -1,2 +1,2 @@
-add_subdirectory(circt-cfa-trace)
-add_subdirectory(circt-cfa-trace-opt)
+add_subdirectory(circt-cf)
+add_subdirectory(circt-cf-opt)
