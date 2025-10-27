@@ -13,7 +13,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/PassRegistry.h"
 
-namespace circt::cfatrace {
+namespace circt::svcf {
 
 namespace {
 /// Simple pass that tags every `hw.module` with a marker attribute. This
@@ -44,4 +44,4 @@ void registerInsertHWProbePasses() {
   mlir::PassRegistration<InsertHWProbePass>();
 }
 
-} // namespace circt::cfatrace
+} // namespace circt::svcf

@@ -328,7 +328,7 @@ static void populateMooreTransforms(PassManager &pm) {
     modulePM.addPass(moore::createLowerConcatRefPass());
 
     modulePM.addPass(
-        circt::cfatrace::optimize::moore::createNormalizeProceduresPass());
+        circt::svcf::optimize::moore::createNormalizeProceduresPass());
 
     // Merge multiple always procedures with identical sensitivity lists that
     // write to non-overlapping variables or bit ranges. This reduces the
@@ -338,7 +338,7 @@ static void populateMooreTransforms(PassManager &pm) {
     //   always @(posedge clk) out[31] <= ...;
     // Will be merged into a single procedure that writes all bits of 'out'.
     // modulePM.addPass(
-    //     circt::cfatrace::optimize::moore::createMergeProceduresPass());
+    //     circt::svcf::optimize::moore::createMergeProceduresPass());
     
     // TODO: Enable the following once it not longer interferes with @(...)
     // event control checks. The introduced dummy variables make the event

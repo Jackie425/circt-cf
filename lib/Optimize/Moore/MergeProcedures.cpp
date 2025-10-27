@@ -20,12 +20,12 @@ using namespace mlir;
 using namespace circt;
 using namespace ::circt::moore;
 
-namespace circt::cfatrace::optimize::moore {
+namespace circt::svcf::optimize::moore {
 #define GEN_PASS_DEF_MERGEPROCEDURES
 #include "circt-cf/Optimize/Moore/Passes.h.inc"
-} // namespace circt::cfatrace::optimize::moore
+} // namespace circt::svcf::optimize::moore
 
-namespace circt::cfatrace::optimize::moore {
+namespace circt::svcf::optimize::moore {
 namespace {
 
 /// Represents a write target (variable or bit range)
@@ -421,4 +421,4 @@ void registerMooreTransformPasses() {
   (void)initOnce;
 }
 
-} // namespace circt::cfatrace::optimize::moore
+} // namespace circt::svcf::optimize::moore

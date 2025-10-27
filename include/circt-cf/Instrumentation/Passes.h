@@ -19,7 +19,7 @@ namespace hw {
 class HWDialect;
 } // namespace hw
 
-namespace cfatrace {
+namespace svcf {
 
 #define GEN_PASS_DECL
 #include "circt-cf/Instrumentation/InstrumentationPasses.h.inc"
@@ -27,7 +27,7 @@ namespace cfatrace {
 std::unique_ptr<mlir::Pass> createInsertHWProbePass();
 void registerInsertHWProbePasses();
 
-} // namespace cfatrace
+} // namespace svcf
 } // namespace circt
 
 #endif // CIRCT_CF_INSTRUMENTATION_PASSES_H
