@@ -66,5 +66,5 @@ int main(int argc, char **argv) {
   });
 
   return mlir::failed(mlir::MlirOptMain(
-      argc, argv, "CIRCT CFA Trace modular optimizer driver", registry));
+      argc, argv, "CIRCT CF modular optimizer driver", registry));
 }
