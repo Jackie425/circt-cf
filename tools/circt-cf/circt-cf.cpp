@@ -12,6 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "circt-cf/Instrumentation/Passes.h"
 #include "circt-cf/Optimize/LLHD/Passes.h"
 #include "circt-cf/Optimize/Moore/Passes.h"
 #include "circt/Conversion/ExportVerilog.h"
@@ -327,9 +328,8 @@ static void populateMooreTransforms(PassManager &pm) {
     auto &modulePM = pm.nest<moore::SVModuleOp>();
     modulePM.addPass(moore::createLowerConcatRefPass());
 
-    modulePM.addPass(
-        circt::svcf::optimize::moore::createNormalizeProceduresPass());
-
+    modulePM.addPass(circt::svcf::optimize::moore::createNormalizeProceduresPass()); // opt pass for or1200
+    modulePM.addPass(circt::svcf::createMooreInstrumentCoveragePass());
     // Merge multiple always procedures with identical sensitivity lists that
     // write to non-overlapping variables or bit ranges. This reduces the
     // number of procedures in the IR, which can improve compilation time and
@@ -682,6 +682,9 @@ int main(int argc, char **argv) {
   // Register any pass manager command line options.
   llhd::registerPasses();
   moore::registerPasses();
+  circt::svcf::registerInsertHWProbePasses();
+  circt::svcf::registerMooreInstrumentCoveragePass();
+  circt::svcf::registerMooreExportProcessCFGPass();
   registerMLIRContextCLOptions();
   registerPassManagerCLOptions();
   registerDefaultTimingManagerCLOptions();

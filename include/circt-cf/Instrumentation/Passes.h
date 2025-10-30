@@ -27,6 +27,12 @@ namespace svcf {
 std::unique_ptr<mlir::Pass> createInsertHWProbePass();
 void registerInsertHWProbePasses();
 
+std::unique_ptr<mlir::Pass> createMooreInstrumentCoveragePass();
+void registerMooreInstrumentCoveragePass();
+
+std::unique_ptr<mlir::Pass> createMooreExportProcessCFGPass();
+void registerMooreExportProcessCFGPass();
+
 } // namespace svcf
 } // namespace circt
 

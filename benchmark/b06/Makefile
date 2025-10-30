@@ -1,5 +1,5 @@
 # simple Makefile to test a CIRCT flow from SystemVerilog to MLIR to SystemVerilog
-DESIGN ?= b01
+DESIGN ?= b06
 BUILD_DIR = build
 
 # Debug options for LLVM_DEBUG output

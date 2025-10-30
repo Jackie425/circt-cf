@@ -48,6 +48,8 @@ int main(int argc, char **argv) {
 
   // Register ONLY your custom CFA trace passes
   circt::svcf::registerInsertHWProbePasses();
+  circt::svcf::registerMooreInstrumentCoveragePass();
+  circt::svcf::registerMooreExportProcessCFGPass();
   // If you need more custom passes in the future, add them here:
   // circt::svcf::registerOtherCustomPasses();
 
