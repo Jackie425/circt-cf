@@ -29,12 +29,12 @@
 using namespace mlir;
 using namespace circt;
 
-namespace circt::svcf {
+namespace circt::pcov {
 #define GEN_PASS_DEF_MOOREINSTRUMENTCOVERAGE
 #include "circt-cf/Instrumentation/InstrumentationPasses.h.inc"
-} // namespace circt::svcf
+} // namespace circt::pcov
 
-namespace circt::svcf {
+namespace circt::pcov {
 namespace {
 
 struct CoverageVars {
@@ -279,26 +279,26 @@ CoverageVars MooreInstrumentCoveragePass::getOrCreateCoverageVars(
       builder, loc, config.fpRefType,
       builder.getStringAttr(makeName("cf_fp_prev_reg")), zeroFp);
   cfFpPrev.getDefiningOp()->setAttr(
-      "svcf.coverage.role", builder.getStringAttr("cf_fp_prev"));
+      "pcov.coverage.role", builder.getStringAttr("cf_fp_prev"));
 
   Value cfFpCurr = moore::VariableOp::create(
       builder, loc, config.fpRefType,
       builder.getStringAttr(makeName("cf_fp_curr_reg")), zeroFp);
   cfFpCurr.getDefiningOp()->setAttr(
-      "svcf.coverage.role", builder.getStringAttr("cf_fp_curr"));
+      "pcov.coverage.role", builder.getStringAttr("cf_fp_curr"));
 
   Value cfTransSig = moore::VariableOp::create(
       builder, loc, config.transSigRefType,
       builder.getStringAttr(makeName("cf_trans_sig_reg")), zeroTransSig);
   cfTransSig.getDefiningOp()->setAttr(
-      "svcf.coverage.role", builder.getStringAttr("cf_trans_sig"));
+      "pcov.coverage.role", builder.getStringAttr("cf_trans_sig"));
 
   Value cfTransBitmap = moore::VariableOp::create(
       builder, loc, config.transBitmapRefType,
       builder.getStringAttr(makeName("cf_trans_bitmap_reg")),
       zeroTransBitmap);
   cfTransBitmap.getDefiningOp()->setAttr(
-      "svcf.coverage.role", builder.getStringAttr("cf_trans_bitmap"));
+      "pcov.coverage.role", builder.getStringAttr("cf_trans_bitmap"));
 
   CoverageVars vars{cfFpPrev, cfFpCurr, cfTransSig, cfTransBitmap};
   coverageVars.try_emplace(key, vars);
@@ -519,17 +519,17 @@ void MooreInstrumentCoveragePass::instrumentExitBlocks(
     unsigned recordedExitIndex = exitIndexIt->second;
     IntegerAttr exitIndexAttr =
         attrBuilder.getI32IntegerAttr(recordedExitIndex);
-    terminator->setAttr("svcf.coverage.instrumented", instrumentedAttr);
-    terminator->setAttr("svcf.cff_exit_block", exitIndexAttr);
-    terminator->setAttr("svcf.leaf_id", exitIndexAttr);
+    terminator->setAttr("pcov.coverage.instrumented", instrumentedAttr);
+    terminator->setAttr("pcov.cff_exit_block", exitIndexAttr);
+    terminator->setAttr("pcov.leaf_id", exitIndexAttr);
   }
 
   // Annotate the procedure itself.
   Builder builder(proc.getContext());
-  proc->setAttr("svcf.coverage.instrumented", instrumentedAttr);
-  proc->setAttr("svcf.coverage.proc_index",
+  proc->setAttr("pcov.coverage.instrumented", instrumentedAttr);
+  proc->setAttr("pcov.coverage.proc_index",
                 builder.getI32IntegerAttr(procIndex));
-  proc->setAttr("svcf.coverage.fp_width",
+  proc->setAttr("pcov.coverage.fp_width",
                 builder.getI32IntegerAttr(config.fpWidth));
 }
 
@@ -550,9 +550,9 @@ void MooreInstrumentCoveragePass::runOnOperation() {
     // If there are no conditional edges, record metadata and move on.
     if (analysis.fpWidth == 0) {
       Builder builder(context);
-      proc->setAttr("svcf.coverage.proc_index",
+      proc->setAttr("pcov.coverage.proc_index",
                     builder.getI32IntegerAttr(procIndex));
-      proc->setAttr("svcf.coverage.fp_width", builder.getI32IntegerAttr(0));
+      proc->setAttr("pcov.coverage.fp_width", builder.getI32IntegerAttr(0));
       ++procIndex;
       continue;
     }
@@ -581,4 +581,4 @@ void registerMooreInstrumentCoveragePass() {
   mlir::PassRegistration<MooreInstrumentCoveragePass>();
 }
 
-} // namespace circt::svcf
+} // namespace circt::pcov

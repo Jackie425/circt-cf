@@ -16,7 +16,7 @@ def LLHDMemToFirMemPass : Pass<"llhd-mem-to-firmem", "::circt::hw::HWModuleOp"> 
     to `seq.firmem` with explicit read and write ports.
   }];
   let constructor =
-      "circt::svcf::optimize::llhd::createLLHDMemToFirMemPass()";
+      "circt::pcov::optimize::llhd::createLLHDMemToFirMemPass()";
 }
 
 #endif // CIRCT_CF_OPTIMIZE_LLHD_PASSES

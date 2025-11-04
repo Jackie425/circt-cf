@@ -16,7 +16,7 @@ def InsertHWProbe : Pass<"insert-hw-probes", "::mlir::ModuleOp"> {
     operation in the input module. External tools can use this marker to
     detect which modules should be instrumented further.
   }];
-  let constructor = "circt::svcf::createInsertHWProbePass()";
+  let constructor = "circt::pcov::createInsertHWProbePass()";
   let dependentDialects = ["circt::hw::HWDialect"];
 }
 
@@ -30,7 +30,7 @@ def MooreInstrumentCoverage
     aggregation. This pass also introduces per-procedure coverage variables
     inside the surrounding Moore module.
   }];
-  let constructor = "circt::svcf::createMooreInstrumentCoveragePass()";
+  let constructor = "circt::pcov::createMooreInstrumentCoveragePass()";
   let dependentDialects = [
     "circt::moore::MooreDialect",
     "mlir::cf::ControlFlowDialect"
@@ -47,7 +47,7 @@ def MooreExportProcessCFG
     blocks in the Moore/CF control-flow graph. This pass is intended for
     visualization and debugging purposes.
   }];
-  let constructor = "circt::svcf::createMooreExportProcessCFGPass()";
+  let constructor = "circt::pcov::createMooreExportProcessCFGPass()";
   let dependentDialects = [
     "circt::moore::MooreDialect",
     "mlir::cf::ControlFlowDialect"

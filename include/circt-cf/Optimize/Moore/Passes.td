@@ -17,7 +17,7 @@ def NormalizeProcedures : Pass<"moore-normalize-procedures", "::circt::moore::SV
     pure combinational logic.
   }];
   let constructor =
-      "circt::svcf::optimize::moore::createNormalizeProceduresPass()";
+      "circt::pcov::optimize::moore::createNormalizeProceduresPass()";
 }
 
 def MergeProcedures : Pass<"moore-merge-procedures", "::circt::moore::SVModuleOp"> {
@@ -27,7 +27,7 @@ def MergeProcedures : Pass<"moore-merge-procedures", "::circt::moore::SVModuleOp
     and operate on disjoint slices of the same variables.
   }];
   let constructor =
-      "circt::svcf::optimize::moore::createMergeProceduresPass()";
+      "circt::pcov::optimize::moore::createMergeProceduresPass()";
 }
 
 #endif // CIRCT_CF_OPTIMIZE_MOORE_PASSES

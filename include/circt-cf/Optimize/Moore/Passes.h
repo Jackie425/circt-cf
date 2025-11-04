@@ -9,7 +9,7 @@
 
 #include "mlir/Pass/Pass.h"
 
-namespace circt::svcf::optimize::moore {
+namespace circt::pcov::optimize::moore {
 
 #define GEN_PASS_DECL
 #include "circt-cf/Optimize/Moore/Passes.h.inc"
@@ -19,6 +19,6 @@ std::unique_ptr<mlir::Pass> createMergeProceduresPass();
 
 void registerMooreTransformPasses();
 
-} // namespace circt::svcf::optimize::moore
+} // namespace circt::pcov::optimize::moore
 
 #endif // CIRCT_CF_OPTIMIZE_MOORE_PASSES_H

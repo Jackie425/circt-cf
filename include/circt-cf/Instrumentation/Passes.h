@@ -19,7 +19,7 @@ namespace hw {
 class HWDialect;
 } // namespace hw
 
-namespace svcf {
+namespace pcov {
 
 #define GEN_PASS_DECL
 #include "circt-cf/Instrumentation/InstrumentationPasses.h.inc"
@@ -33,7 +33,7 @@ void registerMooreInstrumentCoveragePass();
 std::unique_ptr<mlir::Pass> createMooreExportProcessCFGPass();
 void registerMooreExportProcessCFGPass();
 
-} // namespace svcf
+} // namespace pcov
 } // namespace circt
 
 #endif // CIRCT_CF_INSTRUMENTATION_PASSES_H

@@ -47,11 +47,11 @@ int main(int argc, char **argv) {
   // Only register the passes you actually need for testing
 
   // Register ONLY your custom CFA trace passes
-  circt::svcf::registerInsertHWProbePasses();
-  circt::svcf::registerMooreInstrumentCoveragePass();
-  circt::svcf::registerMooreExportProcessCFGPass();
+  circt::pcov::registerInsertHWProbePasses();
+  circt::pcov::registerMooreInstrumentCoveragePass();
+  circt::pcov::registerMooreExportProcessCFGPass();
   // If you need more custom passes in the future, add them here:
-  // circt::svcf::registerOtherCustomPasses();
+  // circt::pcov::registerOtherCustomPasses();
 
   // Register inliner extensions (useful for optimization)
   mlir::func::registerInlinerExtension(registry);

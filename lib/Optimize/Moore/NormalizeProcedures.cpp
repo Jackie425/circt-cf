@@ -17,12 +17,12 @@ using namespace mlir;
 using namespace circt;
 using namespace ::circt::moore;
 
-namespace circt::svcf::optimize::moore {
+namespace circt::pcov::optimize::moore {
 #define GEN_PASS_DEF_NORMALIZEPROCEDURES
 #include "circt-cf/Optimize/Moore/Passes.h.inc"
-} // namespace circt::svcf::optimize::moore
+} // namespace circt::pcov::optimize::moore
 
-namespace circt::svcf::optimize::moore {
+namespace circt::pcov::optimize::moore {
 namespace {
 
 struct ReadAnalyzer {
@@ -187,4 +187,4 @@ std::unique_ptr<mlir::Pass> createNormalizeProceduresPass() {
   return std::make_unique<NormalizeProceduresPass>();
 }
 
-} // namespace circt::svcf::optimize::moore
+} // namespace circt::pcov::optimize::moore

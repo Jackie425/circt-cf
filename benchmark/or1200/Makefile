@@ -1,6 +1,7 @@
 # simple Makefile to test a CIRCT flow from SystemVerilog to MLIR to SystemVerilog
 DESIGN ?= or1200
 BUILD_DIR = build
+CFG_DIR = $(BUILD_DIR)/cfg
 
 # Debug options for LLVM_DEBUG output
 # Use --debug to see all debug output, or --debug-only=<type> for specific types
@@ -24,8 +25,10 @@ run-split:
 	circt-cf --verbose-pass-executions $(DEBUG_OPTS) --sv-sv --split-verilog --split-verilog-dir=$(BUILD_DIR)/split-output -C $(DESIGN).f
 
 graph:
-	circt-opt --hw-print-instance-graph $(BUILD_DIR)/$(DESIGN)_hw.mlir 2> $(BUILD_DIR)/$(DESIGN)_hw.dot
-	dot -Tpng $(BUILD_DIR)/$(DESIGN)_hw.dot -o $(BUILD_DIR)/$(DESIGN)_hw.png
+	mkdir -p $(CFG_DIR)
+	circt-opt --hw-print-instance-graph $(BUILD_DIR)/$(DESIGN)_hw.mlir > /dev/null 2> $(CFG_DIR)/$(DESIGN)_hw.dot
+	dot -Tpng $(CFG_DIR)/$(DESIGN)_hw.dot -o $(CFG_DIR)/$(DESIGN)_hw.png
+	circt-cf-opt --pass-pipeline='builtin.module(moore.module(moore-export-process-cfg{output-dir=$(CFG_DIR)}))' $(BUILD_DIR)/$(DESIGN)_moore.mlir > /dev/null 2>&1
 
 clean:
 	rm -rf $(BUILD_DIR)

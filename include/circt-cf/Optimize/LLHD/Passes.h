@@ -9,7 +9,7 @@
 
 #include "mlir/Pass/Pass.h"
 
-namespace circt::svcf::optimize::llhd {
+namespace circt::pcov::optimize::llhd {
 
 #define GEN_PASS_DECL
 #include "circt-cf/Optimize/LLHD/Passes.h.inc"
@@ -18,6 +18,6 @@ std::unique_ptr<mlir::Pass> createLLHDMemToFirMemPass();
 
 void registerLLHDTransformPasses();
 
-} // namespace circt::svcf::optimize::llhd
+} // namespace circt::pcov::optimize::llhd
 
 #endif // CIRCT_CF_OPTIMIZE_LLHD_PASSES_H

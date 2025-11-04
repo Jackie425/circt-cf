@@ -24,16 +24,16 @@ using namespace ::circt::llhd;
 using namespace ::circt::hw;
 using namespace ::circt::seq;
 
-namespace circt::svcf::optimize::llhd {
+namespace circt::pcov::optimize::llhd {
 namespace cllhd = ::circt::llhd;
 namespace chw = ::circt::hw;
 namespace cseq = ::circt::seq;
 namespace ccomb = ::circt::comb;
 #define GEN_PASS_DEF_LLHDMEMTOFIRMEMPASS
 #include "circt-cf/Optimize/LLHD/Passes.h.inc"
-} // namespace circt::svcf::optimize::llhd
+} // namespace circt::pcov::optimize::llhd
 
-namespace circt::svcf::optimize::llhd {
+namespace circt::pcov::optimize::llhd {
 namespace {
 
 struct PortInfo {
@@ -296,4 +296,4 @@ void registerLLHDTransformPasses() {
   (void)initOnce;
 }
 
-} // namespace circt::svcf::optimize::llhd
+} // namespace circt::pcov::optimize::llhd

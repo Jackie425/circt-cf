@@ -22,12 +22,12 @@
 using namespace mlir;
 using namespace circt;
 
-namespace circt::svcf {
+namespace circt::pcov {
 #define GEN_PASS_DEF_MOOREEXPORTPROCESSCFG
 #include "circt-cf/Instrumentation/InstrumentationPasses.h.inc"
-} // namespace circt::svcf
+} // namespace circt::pcov
 
-namespace circt::svcf {
+namespace circt::pcov {
 namespace {
 
 /// Sanitize strings that will be used in file names to avoid characters that
@@ -73,7 +73,8 @@ public:
 private:
   LogicalResult emitProcedureCFG(moore::SVModuleOp module,
                                  moore::ProcedureOp proc,
-                                 StringRef directory) const;
+                                 StringRef directory,
+                                 unsigned procIndex) const;
   void writeDotHeader(raw_ostream &os, StringRef graphName) const;
   void writeDotNodes(raw_ostream &os, llvm::ArrayRef<Block *> blockOrder,
                      const llvm::DenseMap<Block *, std::string> &blockNames)
@@ -86,11 +87,14 @@ private:
 LogicalResult
 MooreExportProcessCFGPass::emitProcedureCFG(moore::SVModuleOp module,
                                             moore::ProcedureOp proc,
-                                            StringRef directory) const {
-  std::string moduleName = sanitizeForFileName(
-      getSymbolNameOrFallback(module.getOperation(), "module"), "module");
-  std::string procName = sanitizeForFileName(
-      getSymbolNameOrFallback(proc.getOperation(), "proc"), "proc");
+                                            StringRef directory,
+                                            unsigned procIndex) const {
+  std::string moduleSymbol =
+      getSymbolNameOrFallback(module.getOperation(), "module");
+  std::string procSymbol =
+      getSymbolNameOrFallback(proc.getOperation(), "proc", procIndex);
+  std::string moduleName = sanitizeForFileName(moduleSymbol, "module");
+  std::string procName = sanitizeForFileName(procSymbol, "proc");
 
   SmallString<256> filePath(directory);
   llvm::sys::path::append(filePath,
@@ -127,10 +131,21 @@ MooreExportProcessCFGPass::emitProcedureCFG(moore::SVModuleOp module,
   }
 
   std::string graphName = (Twine(moduleName) + "__" + procName).str();
-  writeDotHeader(file, graphName);
-  writeDotNodes(file, blockOrder, blockNames);
-  writeDotEdges(file, blockOrder, blockNames);
-  file << "}\n";
+  auto writeGraph = [&](raw_ostream &os) {
+    writeDotHeader(os, graphName);
+    writeDotNodes(os, blockOrder, blockNames);
+    writeDotEdges(os, blockOrder, blockNames);
+    os << "}\n";
+  };
+
+  writeGraph(file);
+  file.flush();
+
+  raw_ostream &stdoutStream = llvm::outs();
+  stdoutStream << "// CFG for module `" << moduleSymbol << "`, procedure `"
+               << procSymbol << "`\n";
+  writeGraph(stdoutStream);
+  stdoutStream.flush();
 
   proc.emitRemark("wrote CFG to ") << filePath;
   return success();
@@ -191,8 +206,9 @@ void MooreExportProcessCFGPass::runOnOperation() {
   llvm::SmallString<256> resolvedDir(directory);
   llvm::sys::path::remove_dots(resolvedDir, /*remove_dot_dot=*/true);
 
+  unsigned procIndex = 0;
   for (moore::ProcedureOp proc : module.getOps<moore::ProcedureOp>()) {
-    if (failed(emitProcedureCFG(module, proc, resolvedDir))) {
+    if (failed(emitProcedureCFG(module, proc, resolvedDir, procIndex++))) {
       signalPassFailure();
       return;
     }
@@ -209,4 +225,4 @@ void registerMooreExportProcessCFGPass() {
   mlir::PassRegistration<MooreExportProcessCFGPass>();
 }
 
-} // namespace circt::svcf
+} // namespace circt::pcov

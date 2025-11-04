@@ -328,8 +328,8 @@ static void populateMooreTransforms(PassManager &pm) {
     auto &modulePM = pm.nest<moore::SVModuleOp>();
     modulePM.addPass(moore::createLowerConcatRefPass());
 
-    modulePM.addPass(circt::svcf::optimize::moore::createNormalizeProceduresPass()); // opt pass for or1200
-    modulePM.addPass(circt::svcf::createMooreInstrumentCoveragePass());
+    modulePM.addPass(circt::pcov::optimize::moore::createNormalizeProceduresPass()); // opt pass for or1200
+    modulePM.addPass(circt::pcov::createMooreInstrumentCoveragePass());
     // Merge multiple always procedures with identical sensitivity lists that
     // write to non-overlapping variables or bit ranges. This reduces the
     // number of procedures in the IR, which can improve compilation time and
@@ -338,7 +338,7 @@ static void populateMooreTransforms(PassManager &pm) {
     //   always @(posedge clk) out[31] <= ...;
     // Will be merged into a single procedure that writes all bits of 'out'.
     // modulePM.addPass(
-    //     circt::svcf::optimize::moore::createMergeProceduresPass());
+    //     circt::pcov::optimize::moore::createMergeProceduresPass());
     
     // TODO: Enable the following once it not longer interferes with @(...)
     // event control checks. The introduced dummy variables make the event
@@ -682,9 +682,9 @@ int main(int argc, char **argv) {
   // Register any pass manager command line options.
   llhd::registerPasses();
   moore::registerPasses();
-  circt::svcf::registerInsertHWProbePasses();
-  circt::svcf::registerMooreInstrumentCoveragePass();
-  circt::svcf::registerMooreExportProcessCFGPass();
+  circt::pcov::registerInsertHWProbePasses();
+  circt::pcov::registerMooreInstrumentCoveragePass();
+  circt::pcov::registerMooreExportProcessCFGPass();
   registerMLIRContextCLOptions();
   registerPassManagerCLOptions();
   registerDefaultTimingManagerCLOptions();
