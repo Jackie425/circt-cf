@@ -34,7 +34,7 @@ graph:
 	circt-cf-opt --pass-pipeline='builtin.module(moore.module(moore-export-process-cfg{output-dir=$(CFG_DIR)}))' $(BUILD_DIR)/$(DESIGN)_moore.mlir > /dev/null 2>&1
 
 synth: run
-    mkdir -p $(SYNTH_DIR)
+	mkdir -p $(SYNTH_DIR)
 	yosys -Q -s synth.ys
 
 clean:
