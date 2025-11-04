@@ -327,19 +327,21 @@ Value MooreInstrumentCoveragePass::createZeroConstant(OpBuilder &builder,
   return createConstant(builder, loc, type, APInt(type.getWidth(), 0));
 }
 
-Value MooreInstrumentCoveragePass::accumulateForEdge(
-    OpBuilder &builder, Location loc, Block *pred, Block *succ, Value pathSum,
-    const CoverageConfig &config,
-    const ProcedureAnalysis &analysis) const {
+Value MooreInstrumentCoveragePass::accumulateForEdge(OpBuilder &builder,
+                                                     Location loc, Block *pred,
+                                                     Block *succ, Value pathSum,
+                                                     const CoverageConfig &config,
+                                                     const ProcedureAnalysis &analysis) const {
   auto it = analysis.weight.find(EdgeKey{pred, succ});
   assert(it != analysis.weight.end() && "missing Ball-Larus edge weight");
   uint64_t weightValue = it->second;
   if (weightValue == 0)
     return pathSum;
 
-  APInt value(config.pathIdWidth, weightValue);
-  Value weightConst = createConstant(builder, loc, config.pathIdType, value);
-  return moore::AddOp::create(builder, loc, pathSum, weightConst).getResult();
+  Value weightConst = createConstant(builder, loc, config.pathIdType,
+                                     APInt(config.pathIdWidth, weightValue));
+  return builder.create<moore::AddOp>(loc, config.pathIdType, pathSum,
+                                      weightConst);
 }
 
 void MooreInstrumentCoveragePass::addCoverageEntryAndArguments(
@@ -380,13 +382,10 @@ void MooreInstrumentCoveragePass::rewriteTerminators(
     if (auto cond = dyn_cast<cf::CondBranchOp>(terminator)) {
       Block *trueDest = cond.getTrueDest();
       Block *falseDest = cond.getFalseDest();
-
-      Value truePath =
-          accumulateForEdge(builder, loc, &block, trueDest, pathSum, config,
-                            analysis);
-      Value falsePath =
-          accumulateForEdge(builder, loc, &block, falseDest, pathSum, config,
-                            analysis);
+      Value truePath = accumulateForEdge(builder, loc, &block, trueDest,
+                                         pathSum, config, analysis);
+      Value falsePath = accumulateForEdge(builder, loc, &block, falseDest,
+                                          pathSum, config, analysis);
 
       SmallVector<Value> trueArgs;
       trueArgs.push_back(truePath);
@@ -406,11 +405,11 @@ void MooreInstrumentCoveragePass::rewriteTerminators(
 
     if (auto br = dyn_cast<cf::BranchOp>(terminator)) {
       Block *dest = br.getDest();
-      Value updated = accumulateForEdge(builder, loc, &block, dest, pathSum,
+      Value nextSum = accumulateForEdge(builder, loc, &block, dest, pathSum,
                                         config, analysis);
 
       SmallVector<Value> operands;
-      operands.push_back(updated);
+      operands.push_back(nextSum);
       operands.append(br.getDestOperands().begin(),
                       br.getDestOperands().end());
 

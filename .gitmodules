@@ -2,3 +2,8 @@
 	path = benchmark/or1200/or1200
 	url = https://github.com/Jackie425/or1200.git
 	branch = master
+
+[submodule "benchmark/mor1kx/mor1kx"]
+	path = benchmark/mor1kx/mor1kx
+	url = https://github.com/openrisc/mor1kx.git
+	branch = master
