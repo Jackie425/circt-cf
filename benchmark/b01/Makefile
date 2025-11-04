@@ -2,6 +2,8 @@
 DESIGN ?= b01
 BUILD_DIR = build
 CFG_DIR = $(BUILD_DIR)/cfg
+SYNTH_DIR = $(BUILD_DIR)/synth
+
 # Debug options for LLVM_DEBUG output
 # Use --debug to see all debug output, or --debug-only=<type> for specific types
 
@@ -30,6 +32,10 @@ graph:
 	circt-opt --hw-print-instance-graph $(BUILD_DIR)/$(DESIGN)_hw.mlir > /dev/null 2> $(CFG_DIR)/$(DESIGN)_inst.dot
 	dot -Tpng $(CFG_DIR)/$(DESIGN)_inst.dot -o $(CFG_DIR)/$(DESIGN)_inst.png
 	circt-cf-opt --pass-pipeline='builtin.module(moore.module(moore-export-process-cfg{output-dir=$(CFG_DIR)}))' $(BUILD_DIR)/$(DESIGN)_moore.mlir > /dev/null 2>&1
+
+synth: run
+    mkdir -p $(SYNTH_DIR)
+	yosys -Q -s synth.ys
 
 clean:
 	rm -rf $(BUILD_DIR)

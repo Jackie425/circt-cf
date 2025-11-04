@@ -1,0 +1,15 @@
+# Minimal Yosys script to grab LUT/FF/BRAM/DSP counts for b01.v and build/b01.sv.
+
+# Original RTL
+design -reset
+read_verilog -sv b01.v
+synth_xilinx -family xcup -flatten -top b01
+tee -q -o build/synth/b01_original.json stat -json
+tee -o build/synth/b01_original.rpt stat -tech xilinx
+
+# Instrumented RTL
+design -reset
+read_verilog -sv build/b01.sv
+synth_xilinx -family xcup -flatten -top b01
+tee -q -o build/synth/b01_instrumented.json stat -json
+tee -o build/synth/b01_instrumented.rpt stat -tech xilinx
