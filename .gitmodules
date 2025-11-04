@@ -7,3 +7,8 @@
 	path = benchmark/mor1kx/mor1kx
 	url = https://github.com/openrisc/mor1kx.git
 	branch = master
+
+[submodule "benchmark/cva6/cva6"]
+	path = benchmark/cva6/cva6
+	url = https://github.com/openhwgroup/cva6.git
+	branch = master
