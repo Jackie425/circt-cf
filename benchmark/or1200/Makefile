@@ -15,7 +15,8 @@ default: run
 
 run:
 	mkdir -p $(BUILD_DIR)
-	circt-cf --mlir-pretty-debuginfo --verbose-pass-executions $(DEBUG_OPTS) --ir-moore -C $(DESIGN).f -o $(BUILD_DIR)/$(DESIGN)_moore.mlir
+		circt-cf --ir-moore -C $(DESIGN).f -o build/$(DESIGN)_moore_cov.mlir \
+         --mlir-print-ir-before=moore-instrument-coverage > build/$(DESIGN)_moore.mlir 2>&1
 	circt-cf --mlir-pretty-debuginfo --verbose-pass-executions $(DEBUG_OPTS) --ir-hw -C $(DESIGN).f -o $(BUILD_DIR)/$(DESIGN)_hw.mlir
 	circt-cf --mlir-pretty-debuginfo --verbose-pass-executions $(DEBUG_OPTS) --ir-sv -C $(DESIGN).f -o $(BUILD_DIR)/$(DESIGN)_sv.mlir
 	circt-cf --mlir-pretty-debuginfo --verbose-pass-executions $(DEBUG_OPTS) --sv-sv -C $(DESIGN).f -o $(BUILD_DIR)/$(DESIGN).sv

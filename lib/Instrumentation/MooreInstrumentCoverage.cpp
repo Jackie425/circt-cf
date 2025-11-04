@@ -1,4 +1,4 @@
-//===- MooreInstrumentCoverage.cpp - Moore coverage instrumentation -------===//
+//===- MooreInstrumentCoverage.cpp - Moore path coverage instrumentation --===//
 //
 // Part of the circt-cf project.
 //
@@ -21,7 +21,6 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/MathExtras.h"
-#include <algorithm>
 #include <cassert>
 #include <optional>
 #include <utility>
@@ -37,50 +36,25 @@ namespace circt::pcov {
 namespace circt::pcov {
 namespace {
 
-struct CoverageVars {
-  Value cfFpPrevReg;
-  Value cfFpCurrReg;
-  Value cfTransSigReg;
-  Value cfTransBitmapReg;
-
-  bool isValid() const {
-    return cfFpPrevReg && cfFpCurrReg && cfTransSigReg && cfTransBitmapReg;
-  }
-};
-
 struct CoverageConfig {
-  unsigned fpWidth = 0;
-  unsigned transSigWidth = 0;
-  unsigned transBitmapWidth = 128;
-
-  moore::IntType fpType;
-  moore::RefType fpRefType;
-
-  moore::IntType transSigType;
-  moore::RefType transSigRefType;
-
-  moore::IntType transBitmapType;
-  moore::RefType transBitmapRefType;
+  unsigned pathIdWidth = 0;
+  moore::IntType pathIdType;
+  moore::RefType pathIdRefType;
 };
 
-struct MergeSliceInfo {
-  unsigned start = 0;
-  unsigned width = 0;
-  APInt clearMask;
-  llvm::DenseMap<Block *, unsigned> predCode;
-  llvm::DenseMap<Block *, APInt> insertConst;
-
-  MergeSliceInfo() = default;
-  MergeSliceInfo(unsigned start, unsigned width, const APInt &clearMask)
-      : start(start), width(width), clearMask(clearMask) {}
+struct CoverageVars {
+  Value pathIdReg;
+  bool isValid() const { return pathIdReg != nullptr; }
 };
+
+using EdgeKey = std::pair<Block *, Block *>;
 
 struct ProcedureAnalysis {
-  Block *returnBlock = nullptr;
-  llvm::DenseMap<Block *, MergeSliceInfo> mergeInfoByBlock;
-  unsigned fpWidth = 0;
-  llvm::SmallVector<Block *> exitBlocks;
-  llvm::DenseMap<Block *, unsigned> exitBlockIndex;
+  Block *entryBlock = nullptr;
+  Block *exitBlock = nullptr;
+  unsigned pathIdWidth = 0;
+  llvm::DenseMap<Block *, uint64_t> numPaths;
+  llvm::DenseMap<EdgeKey, uint64_t> weight;
 };
 
 class MooreInstrumentCoveragePass
@@ -89,10 +63,9 @@ public:
   void runOnOperation() override;
 
 private:
-  CoverageConfig buildCoverageConfig(mlir::MLIRContext *context,
-                                     unsigned fpWidth) const;
-  std::optional<ProcedureAnalysis>
-  analyzeProcedure(moore::ProcedureOp proc) const;
+  CoverageConfig buildCoverageConfig(MLIRContext *context,
+                                     unsigned pathIdWidth) const;
+  std::optional<ProcedureAnalysis> analyzeProcedure(moore::ProcedureOp proc);
   CoverageVars getOrCreateCoverageVars(moore::ProcedureOp proc,
                                        unsigned procIndex,
                                        const CoverageConfig &config);
@@ -103,147 +76,200 @@ private:
   void rewriteTerminators(moore::ProcedureOp proc,
                           const CoverageConfig &config,
                           const ProcedureAnalysis &analysis);
-  void instrumentExitBlocks(moore::ProcedureOp proc, unsigned procIndex,
-                            const CoverageVars &vars,
-                            const CoverageConfig &config,
-                            const ProcedureAnalysis &analysis,
-                            UnitAttr instrumentedAttr);
+  void instrumentExitBlock(moore::ProcedureOp proc, unsigned procIndex,
+                           const CoverageVars &vars,
+                           UnitAttr instrumentedAttr,
+                           const ProcedureAnalysis &analysis);
 
   Value createConstant(OpBuilder &builder, Location loc, moore::IntType type,
                        const APInt &value) const;
   Value createZeroConstant(OpBuilder &builder, Location loc,
                            moore::IntType type) const;
-  Value updateFootprintForSuccessor(OpBuilder &builder, Location loc,
-                                    Block *pred, Block *succ, Value fpAcc,
-                                    const CoverageConfig &config,
-                                    const ProcedureAnalysis &analysis) const;
-  Value buildTransitionHash(OpBuilder &builder, Location loc,
-                            const CoverageConfig &config,
-                            Value transSig) const;
+  Value accumulateForEdge(OpBuilder &builder, Location loc, Block *pred,
+                          Block *succ, Value pathSum,
+                          const CoverageConfig &config,
+                          const ProcedureAnalysis &analysis) const;
 
+  bool encounteredFatalError = false;
   llvm::DenseMap<Operation *, CoverageVars> coverageVars;
 };
 
+namespace {
+
+static bool isEdgeTriggeredClock(moore::DetectEventOp detect) {
+  using moore::Edge;
+  switch (detect.getEdge()) {
+  case Edge::PosEdge:
+  case Edge::NegEdge:
+    return true;
+  default:
+    return false;
+  }
+}
+
+static bool hasEdgeTriggeredClock(moore::WaitEventOp waitEvent) {
+  bool hasClock = false;
+  waitEvent.getBody().walk([&](moore::DetectEventOp detect) {
+    hasClock |= isEdgeTriggeredClock(detect);
+  });
+  return hasClock;
+}
+
+} // namespace
+
 CoverageConfig
-MooreInstrumentCoveragePass::buildCoverageConfig(mlir::MLIRContext *context,
-                                                 unsigned fpWidth) const {
+MooreInstrumentCoveragePass::buildCoverageConfig(MLIRContext *context,
+                                                 unsigned pathIdWidth) const {
   CoverageConfig config;
-  config.fpWidth = fpWidth;
-  config.transSigWidth = fpWidth * 2;
-  config.transBitmapWidth = 128;
-
-  config.fpType = moore::IntType::getLogic(context, fpWidth);
-  config.fpRefType =
-      moore::RefType::get(llvm::cast<moore::UnpackedType>(config.fpType));
-
-  config.transSigType = moore::IntType::getLogic(context, config.transSigWidth);
-  config.transSigRefType = moore::RefType::get(
-      llvm::cast<moore::UnpackedType>(config.transSigType));
-
-  config.transBitmapType =
-      moore::IntType::getLogic(context, config.transBitmapWidth);
-  config.transBitmapRefType = moore::RefType::get(
-      llvm::cast<moore::UnpackedType>(config.transBitmapType));
-
+  config.pathIdWidth = std::max(1u, pathIdWidth);
+  config.pathIdType = moore::IntType::getLogic(context, config.pathIdWidth);
+  config.pathIdRefType =
+      moore::RefType::get(llvm::cast<moore::UnpackedType>(config.pathIdType));
   return config;
 }
 
 std::optional<ProcedureAnalysis>
-MooreInstrumentCoveragePass::analyzeProcedure(moore::ProcedureOp proc) const {
+MooreInstrumentCoveragePass::analyzeProcedure(moore::ProcedureOp proc) {
   ProcedureAnalysis analysis;
+  Region &body = proc.getBody();
+  if (body.empty())
+    return std::nullopt;
 
-  // Locate the unique return block.
-  for (Block &block : proc.getBody()) {
-    if (isa_and_nonnull<moore::ReturnOp>(block.getTerminator())) {
-      analysis.returnBlock = &block;
-      break;
+  analysis.entryBlock = &body.front();
+
+  auto waitEvent =
+      dyn_cast_or_null<moore::WaitEventOp>(analysis.entryBlock->empty()
+                                               ? nullptr
+                                               : &analysis.entryBlock->front());
+  if (!waitEvent || !hasEdgeTriggeredClock(waitEvent))
+    return std::nullopt;
+
+  for (Block &block : body) {
+    if (auto *term = block.getTerminator();
+        isa<moore::ReturnOp>(term)) {
+      if (analysis.exitBlock && analysis.exitBlock != &block) {
+        proc.emitError("procedure must have a unique return block for path "
+                       "coverage instrumentation");
+        signalPassFailure();
+        encounteredFatalError = true;
+        return std::nullopt;
+      }
+      analysis.exitBlock = &block;
     }
   }
 
-  if (!analysis.returnBlock) {
-    proc.emitError("procedure lacks a return block, cannot instrument coverage");
+  if (!analysis.exitBlock) {
+    proc.emitError("procedure lacks a return block, cannot instrument path "
+                   "coverage");
+    signalPassFailure();
+    encounteredFatalError = true;
     return std::nullopt;
   }
 
-  llvm::DenseMap<Block *, llvm::SmallVector<Block *, 4>> predecessors;
+  llvm::DenseMap<Block *, llvm::SmallVector<Block *, 2>> successors;
+  llvm::DenseMap<Block *, unsigned> indegree;
 
-  // Gather predecessor information and identify exit blocks.
-  for (Block &block : proc.getBody()) {
+  for (Block &block : body) {
+    indegree.try_emplace(&block, 0);
+  }
+
+  auto recordEdge = [&](Block *from, Block *to) {
+    successors[from].push_back(to);
+    ++indegree[to];
+  };
+
+  for (Block &block : body) {
     Operation *terminator = block.getTerminator();
 
     if (auto cond = dyn_cast<cf::CondBranchOp>(terminator)) {
-      predecessors[cond.getTrueDest()].push_back(&block);
-      predecessors[cond.getFalseDest()].push_back(&block);
-    } else if (auto br = dyn_cast<cf::BranchOp>(terminator)) {
-      predecessors[br.getDest()].push_back(&block);
-
-      if (&block != analysis.returnBlock &&
-          br.getDest() == analysis.returnBlock) {
-        unsigned exitIndex = analysis.exitBlocks.size();
-        analysis.exitBlocks.push_back(&block);
-        analysis.exitBlockIndex.try_emplace(&block, exitIndex);
-      }
+      recordEdge(&block, cond.getTrueDest());
+      recordEdge(&block, cond.getFalseDest());
+      continue;
     }
-  }
-
-  struct MergeTmpInfo {
-    Block *block = nullptr;
-    llvm::SmallVector<Block *, 4> preds;
-    unsigned start = 0;
-    unsigned width = 0;
-  };
-  llvm::SmallVector<MergeTmpInfo> mergeTmpInfos;
-
-  unsigned offset = 0;
-  for (Block &block : proc.getBody()) {
-    Block *blockPtr = &block;
-    auto predIt = predecessors.find(blockPtr);
-    unsigned predCount =
-        predIt != predecessors.end() ? predIt->second.size() : 0;
-    bool isMerge = predCount >= 2 || blockPtr == analysis.returnBlock;
-    if (!isMerge)
+    if (auto br = dyn_cast<cf::BranchOp>(terminator)) {
+      recordEdge(&block, br.getDest());
+      continue;
+    }
+    if (isa<moore::ReturnOp>(terminator))
       continue;
 
-    MergeTmpInfo info;
-    info.block = blockPtr;
-    if (predIt != predecessors.end())
-      info.preds = predIt->second;
-    info.width =
-        std::max(1u, llvm::Log2_64_Ceil(static_cast<uint64_t>(info.preds.size()) +
-                                        1));
-    info.start = offset;
-    offset += info.width;
-    mergeTmpInfos.push_back(std::move(info));
+    terminator->emitError(
+        "unsupported terminator for path coverage instrumentation");
+    signalPassFailure();
+    encounteredFatalError = true;
+    return std::nullopt;
   }
 
-  analysis.fpWidth = offset;
+  llvm::SmallVector<Block *, 16> worklist;
+  llvm::SmallVector<Block *, 16> topoOrder;
+  for (Block &block : body)
+    if (indegree.lookup(&block) == 0)
+      worklist.push_back(&block);
 
-  if (analysis.fpWidth == 0)
-    return analysis;
+  while (!worklist.empty()) {
+    Block *current = worklist.pop_back_val();
+    topoOrder.push_back(current);
+    for (Block *succ : successors[current]) {
+      unsigned &count = indegree[succ];
+      if (--count == 0)
+        worklist.push_back(succ);
+    }
+  }
 
-  for (const MergeTmpInfo &tmp : mergeTmpInfos) {
-    APInt sliceMask(analysis.fpWidth, 0);
-    for (unsigned i = 0; i < tmp.width; ++i)
-      sliceMask.setBit(tmp.start + i);
-    APInt clearMask = ~sliceMask;
+  if (topoOrder.size() != body.getBlocks().size()) {
+    proc.emitError("procedure contains intra-cycle backedges; expected a DAG");
+    signalPassFailure();
+    encounteredFatalError = true;
+    return std::nullopt;
+  }
 
-    MergeSliceInfo info(tmp.start, tmp.width, clearMask);
+  llvm::SmallVector<Block *, 16> reverseTopo(topoOrder.rbegin(),
+                                             topoOrder.rend());
+  analysis.numPaths.try_emplace(analysis.exitBlock, 1);
 
-    unsigned code = 1;
-    for (Block *pred : tmp.preds) {
-      info.predCode.try_emplace(pred, code);
+  for (Block *block : reverseTopo) {
+    if (block == analysis.exitBlock)
+      continue;
 
-      APInt codeValue(tmp.width, code);
-      APInt insertValue = codeValue.zextOrTrunc(analysis.fpWidth);
-      if (tmp.start != 0)
-        insertValue <<= tmp.start;
-      info.insertConst.try_emplace(pred, insertValue);
-      ++code;
+    auto succIt = successors.find(block);
+    if (succIt == successors.end()) {
+      proc.emitError("block without successors cannot reach the unique exit");
+      signalPassFailure();
+      encounteredFatalError = true;
+      return std::nullopt;
     }
 
-    analysis.mergeInfoByBlock.try_emplace(tmp.block, std::move(info));
+    uint64_t pathCount = 0;
+    for (Block *succ : succIt->second) {
+      auto numIt = analysis.numPaths.find(succ);
+      assert(numIt != analysis.numPaths.end() &&
+             "successor should already have a path count");
+      pathCount += numIt->second;
+    }
+    analysis.numPaths.try_emplace(block, pathCount);
   }
 
+  auto entryIt = analysis.numPaths.find(analysis.entryBlock);
+  assert(entryIt != analysis.numPaths.end() &&
+         "entry block must have a path count");
+  uint64_t totalPaths = entryIt->second;
+  if (totalPaths == 0) {
+    proc.emitError("entry block has zero outgoing paths to exit");
+    signalPassFailure();
+    encounteredFatalError = true;
+    return std::nullopt;
+  }
+
+  for (Block *block : topoOrder) {
+    uint64_t base = 0;
+    for (Block *succ : successors[block]) {
+      analysis.weight.try_emplace(EdgeKey{block, succ}, base);
+      base += analysis.numPaths.lookup(succ);
+    }
+  }
+
+  analysis.pathIdWidth =
+      totalPaths == 1 ? 1 : llvm::Log2_64_Ceil(totalPaths);
   return analysis;
 }
 
@@ -251,14 +277,14 @@ CoverageVars MooreInstrumentCoveragePass::getOrCreateCoverageVars(
     moore::ProcedureOp proc, unsigned procIndex,
     const CoverageConfig &config) {
   Operation *key = proc.getOperation();
-  auto it = coverageVars.find(key);
-  if (it != coverageVars.end())
+  if (auto it = coverageVars.find(key); it != coverageVars.end())
     return it->second;
 
   auto module = proc->getParentOfType<moore::SVModuleOp>();
   if (!module) {
     proc.emitError("expected procedure to be nested within a moore.module");
     signalPassFailure();
+    encounteredFatalError = true;
     return {};
   }
 
@@ -270,37 +296,20 @@ CoverageVars MooreInstrumentCoveragePass::getOrCreateCoverageVars(
     return (Twine("cov_proc") + Twine(procIndex) + "_" + suffix).str();
   };
 
-  auto zeroFp = createZeroConstant(builder, loc, config.fpType);
-  auto zeroTransSig = createZeroConstant(builder, loc, config.transSigType);
-  auto zeroTransBitmap =
-      createZeroConstant(builder, loc, config.transBitmapType);
+  Value zero = createZeroConstant(builder, loc, config.pathIdType);
+  Value pathIdReg = moore::VariableOp::create(
+      builder, loc, config.pathIdRefType,
+      builder.getStringAttr(makeName("path_id_reg")), zero);
 
-  Value cfFpPrev = moore::VariableOp::create(
-      builder, loc, config.fpRefType,
-      builder.getStringAttr(makeName("cf_fp_prev_reg")), zeroFp);
-  cfFpPrev.getDefiningOp()->setAttr(
-      "pcov.coverage.role", builder.getStringAttr("cf_fp_prev"));
+  pathIdReg.getDefiningOp()->setAttr(
+      "pcov.coverage.kind", builder.getStringAttr("path"));
+  pathIdReg.getDefiningOp()->setAttr(
+      "pcov.coverage.proc_index", builder.getI32IntegerAttr(procIndex));
+  pathIdReg.getDefiningOp()->setAttr(
+      "pcov.coverage.path_id_width",
+      builder.getI32IntegerAttr(config.pathIdWidth));
 
-  Value cfFpCurr = moore::VariableOp::create(
-      builder, loc, config.fpRefType,
-      builder.getStringAttr(makeName("cf_fp_curr_reg")), zeroFp);
-  cfFpCurr.getDefiningOp()->setAttr(
-      "pcov.coverage.role", builder.getStringAttr("cf_fp_curr"));
-
-  Value cfTransSig = moore::VariableOp::create(
-      builder, loc, config.transSigRefType,
-      builder.getStringAttr(makeName("cf_trans_sig_reg")), zeroTransSig);
-  cfTransSig.getDefiningOp()->setAttr(
-      "pcov.coverage.role", builder.getStringAttr("cf_trans_sig"));
-
-  Value cfTransBitmap = moore::VariableOp::create(
-      builder, loc, config.transBitmapRefType,
-      builder.getStringAttr(makeName("cf_trans_bitmap_reg")),
-      zeroTransBitmap);
-  cfTransBitmap.getDefiningOp()->setAttr(
-      "pcov.coverage.role", builder.getStringAttr("cf_trans_bitmap"));
-
-  CoverageVars vars{cfFpPrev, cfFpCurr, cfTransSig, cfTransBitmap};
+  CoverageVars vars{pathIdReg};
   coverageVars.try_emplace(key, vars);
   return vars;
 }
@@ -318,38 +327,27 @@ Value MooreInstrumentCoveragePass::createZeroConstant(OpBuilder &builder,
   return createConstant(builder, loc, type, APInt(type.getWidth(), 0));
 }
 
-Value MooreInstrumentCoveragePass::updateFootprintForSuccessor(
-    OpBuilder &builder, Location loc, Block *pred, Block *succ, Value fpAcc,
+Value MooreInstrumentCoveragePass::accumulateForEdge(
+    OpBuilder &builder, Location loc, Block *pred, Block *succ, Value pathSum,
     const CoverageConfig &config,
     const ProcedureAnalysis &analysis) const {
-  auto mergeInfoIt = analysis.mergeInfoByBlock.find(succ);
-  if (mergeInfoIt == analysis.mergeInfoByBlock.end())
-    return fpAcc;
+  auto it = analysis.weight.find(EdgeKey{pred, succ});
+  assert(it != analysis.weight.end() && "missing Ball-Larus edge weight");
+  uint64_t weightValue = it->second;
+  if (weightValue == 0)
+    return pathSum;
 
-  const MergeSliceInfo &info = mergeInfoIt->second;
-  if (info.width == 0)
-    return fpAcc;
-  auto insertIt = info.insertConst.find(pred);
-  assert(insertIt != info.insertConst.end() &&
-         "expected predecessor to have insert constant");
-
-  Value clearMaskConst =
-      createConstant(builder, loc, config.fpType, info.clearMask);
-  Value insertConst =
-      createConstant(builder, loc, config.fpType, insertIt->second);
-
-  Value cleared = builder.create<moore::AndOp>(loc, config.fpType, fpAcc,
-                                               clearMaskConst);
-  return builder.create<moore::OrOp>(loc, config.fpType, cleared, insertConst);
+  APInt value(config.pathIdWidth, weightValue);
+  Value weightConst = createConstant(builder, loc, config.pathIdType, value);
+  return moore::AddOp::create(builder, loc, pathSum, weightConst).getResult();
 }
 
 void MooreInstrumentCoveragePass::addCoverageEntryAndArguments(
     moore::ProcedureOp proc, const CoverageConfig &config,
     const ProcedureAnalysis &analysis) {
   Region &body = proc.getBody();
-  Block &originalEntry = body.front();
+  Block &originalEntry = *analysis.entryBlock;
 
-  // Create the new coverage entry block at the beginning of the region.
   auto *coverageEntry = new Block();
   body.getBlocks().insert(body.begin(), coverageEntry);
 
@@ -357,14 +355,13 @@ void MooreInstrumentCoveragePass::addCoverageEntryAndArguments(
   builder.setInsertionPointToStart(coverageEntry);
   Location loc = proc.getLoc();
 
-  Value fpInit = createZeroConstant(builder, loc, config.fpType);
-  builder.create<cf::BranchOp>(loc, &originalEntry, ValueRange{fpInit});
+  Value zero = createZeroConstant(builder, loc, config.pathIdType);
+  builder.create<cf::BranchOp>(loc, &originalEntry, ValueRange{zero});
 
-  // Add the footprint accumulator argument to every original block.
   for (Block &block : body) {
     if (&block == coverageEntry)
       continue;
-    block.insertArgument(0u, config.fpType, loc);
+    block.insertArgument(0u, config.pathIdType, loc);
   }
 }
 
@@ -372,33 +369,32 @@ void MooreInstrumentCoveragePass::rewriteTerminators(
     moore::ProcedureOp proc, const CoverageConfig &config,
     const ProcedureAnalysis &analysis) {
   for (Block &block : proc.getBody()) {
-    // The synthetic coverage entry block has no block argument; skip it.
     if (block.getNumArguments() == 0)
       continue;
 
     Operation *terminator = block.getTerminator();
     OpBuilder builder(terminator);
     Location loc = terminator->getLoc();
-    Value fpAcc = block.getArgument(0);
+    Value pathSum = block.getArgument(0);
 
     if (auto cond = dyn_cast<cf::CondBranchOp>(terminator)) {
       Block *trueDest = cond.getTrueDest();
       Block *falseDest = cond.getFalseDest();
 
-      Value fpTrue =
-          updateFootprintForSuccessor(builder, loc, &block, trueDest, fpAcc,
-                                      config, analysis);
-      Value fpFalse =
-          updateFootprintForSuccessor(builder, loc, &block, falseDest, fpAcc,
-                                      config, analysis);
+      Value truePath =
+          accumulateForEdge(builder, loc, &block, trueDest, pathSum, config,
+                            analysis);
+      Value falsePath =
+          accumulateForEdge(builder, loc, &block, falseDest, pathSum, config,
+                            analysis);
 
       SmallVector<Value> trueArgs;
-      trueArgs.push_back(fpTrue);
+      trueArgs.push_back(truePath);
       trueArgs.append(cond.getTrueOperands().begin(),
                       cond.getTrueOperands().end());
 
       SmallVector<Value> falseArgs;
-      falseArgs.push_back(fpFalse);
+      falseArgs.push_back(falsePath);
       falseArgs.append(cond.getFalseOperands().begin(),
                        cond.getFalseOperands().end());
 
@@ -410,13 +406,14 @@ void MooreInstrumentCoveragePass::rewriteTerminators(
 
     if (auto br = dyn_cast<cf::BranchOp>(terminator)) {
       Block *dest = br.getDest();
-      Value fpNext = updateFootprintForSuccessor(builder, loc, &block, dest,
-                                                 fpAcc, config, analysis);
+      Value updated = accumulateForEdge(builder, loc, &block, dest, pathSum,
+                                        config, analysis);
 
       SmallVector<Value> operands;
-      operands.push_back(fpNext);
+      operands.push_back(updated);
       operands.append(br.getDestOperands().begin(),
                       br.getDestOperands().end());
+
       builder.create<cf::BranchOp>(loc, dest, operands);
       br.erase();
       continue;
@@ -424,148 +421,70 @@ void MooreInstrumentCoveragePass::rewriteTerminators(
   }
 }
 
-Value MooreInstrumentCoveragePass::buildTransitionHash(
-    OpBuilder &builder, Location loc, const CoverageConfig &config,
-    Value transSig) const {
-  unsigned sigWidth = config.transSigWidth;
-  unsigned hashWidth = config.transBitmapWidth;
-
-  if (sigWidth <= hashWidth) {
-    if (sigWidth == hashWidth)
-      return transSig;
-    return builder.create<moore::ZExtOp>(loc, config.transBitmapType, transSig);
-  }
-
-  Value hash =
-      createZeroConstant(builder, loc, config.transBitmapType);
-
-  for (unsigned offset = 0; offset < sigWidth; offset += hashWidth) {
-    unsigned chunkWidth = std::min(hashWidth, sigWidth - offset);
-
-    Value shifted = transSig;
-    if (offset != 0) {
-      APInt shiftValue(config.transSigWidth, offset);
-      Value shiftConst =
-          createConstant(builder, loc, config.transSigType, shiftValue);
-      shifted = builder.create<moore::ShrOp>(loc, config.transSigType, shifted,
-                                             shiftConst);
-    }
-
-    moore::IntType chunkType =
-        moore::IntType::getLogic(builder.getContext(), chunkWidth);
-    Value chunk = builder.create<moore::TruncOp>(loc, chunkType, shifted);
-    if (chunkWidth < hashWidth)
-      chunk = builder.create<moore::ZExtOp>(loc, config.transBitmapType, chunk);
-
-    hash =
-        builder.create<moore::XorOp>(loc, config.transBitmapType, hash, chunk);
-  }
-
-  return hash;
-}
-
-void MooreInstrumentCoveragePass::instrumentExitBlocks(
+void MooreInstrumentCoveragePass::instrumentExitBlock(
     moore::ProcedureOp proc, unsigned procIndex, const CoverageVars &vars,
-    const CoverageConfig &config, const ProcedureAnalysis &analysis,
-    UnitAttr instrumentedAttr) {
-  Builder attrBuilder(proc.getContext());
+    UnitAttr instrumentedAttr, const ProcedureAnalysis &analysis) {
+  if (!analysis.exitBlock)
+    return;
 
-  for (Block *exitBlock : analysis.exitBlocks) {
-    Operation *terminator = exitBlock->getTerminator();
-    OpBuilder builder(terminator);
-    Location loc = terminator->getLoc();
-
-    auto branch = dyn_cast<cf::BranchOp>(terminator);
-    assert(branch && "exit block must terminate with cf.br");
-    Value fpFinal = branch.getDestOperands().front();
-
-    // Write current footprint.
-    moore::NonBlockingAssignOp::create(builder, loc, vars.cfFpCurrReg, fpFinal);
-
-    // Read previous footprint.
-    Value prevFp =
-        moore::ReadOp::create(builder, loc, vars.cfFpPrevReg);
-
-    // Build transition signature.
-    Value prevExt =
-        builder.create<moore::ZExtOp>(loc, config.transSigType, prevFp);
-    Value currExt =
-        builder.create<moore::ZExtOp>(loc, config.transSigType, fpFinal);
-
-    APInt shiftValue(config.transSigWidth, config.fpWidth);
-    Value shiftConst =
-        createConstant(builder, loc, config.transSigType, shiftValue);
-    Value prevShift =
-        builder.create<moore::ShlOp>(loc, config.transSigType, prevExt,
-                                     shiftConst);
-    Value transSig =
-        builder.create<moore::OrOp>(loc, config.transSigType, prevShift,
-                                    currExt);
-
-    moore::NonBlockingAssignOp::create(builder, loc, vars.cfTransSigReg,
-                                       transSig);
-
-    // Compute transition hash and update bitmap register.
-    Value transHash = buildTransitionHash(builder, loc, config, transSig);
-    moore::NonBlockingAssignOp::create(builder, loc, vars.cfTransBitmapReg,
-                                       transHash);
-
-    // Roll the previous footprint.
-    moore::NonBlockingAssignOp::create(builder, loc, vars.cfFpPrevReg, fpFinal);
-
-    auto exitIndexIt = analysis.exitBlockIndex.find(exitBlock);
-    assert(exitIndexIt != analysis.exitBlockIndex.end() &&
-           "missing exit block index");
-    unsigned recordedExitIndex = exitIndexIt->second;
-    IntegerAttr exitIndexAttr =
-        attrBuilder.getI32IntegerAttr(recordedExitIndex);
-    terminator->setAttr("pcov.coverage.instrumented", instrumentedAttr);
-    terminator->setAttr("pcov.cff_exit_block", exitIndexAttr);
-    terminator->setAttr("pcov.leaf_id", exitIndexAttr);
+  Operation *terminator = analysis.exitBlock->getTerminator();
+  auto returnOp = dyn_cast<moore::ReturnOp>(terminator);
+  if (!returnOp) {
+    proc.emitError("expected the unique exit block to end with moore.return");
+    signalPassFailure();
+    encounteredFatalError = true;
+    return;
   }
 
-  // Annotate the procedure itself.
-  Builder builder(proc.getContext());
-  proc->setAttr("pcov.coverage.instrumented", instrumentedAttr);
-  proc->setAttr("pcov.coverage.proc_index",
-                builder.getI32IntegerAttr(procIndex));
-  proc->setAttr("pcov.coverage.fp_width",
-                builder.getI32IntegerAttr(config.fpWidth));
+  OpBuilder builder(returnOp);
+  Location loc = returnOp.getLoc();
+  Value pathSum = analysis.exitBlock->getArgument(0);
+  moore::NonBlockingAssignOp::create(builder, loc, vars.pathIdReg, pathSum);
+
+  Builder attrBuilder(proc.getContext());
+  returnOp->setAttr("pcov.coverage.instrumented", instrumentedAttr);
+  returnOp->setAttr("pcov.coverage.proc_index",
+                    attrBuilder.getI32IntegerAttr(procIndex));
+  returnOp->setAttr("pcov.coverage.kind",
+                    attrBuilder.getStringAttr("path"));
 }
 
 void MooreInstrumentCoveragePass::runOnOperation() {
+  encounteredFatalError = false;
+
   moore::SVModuleOp module = getOperation();
-  auto *context = module.getContext();
+  MLIRContext *context = module.getContext();
   UnitAttr instrumentedAttr = UnitAttr::get(context);
 
   unsigned procIndex = 0;
   for (moore::ProcedureOp proc : module.getOps<moore::ProcedureOp>()) {
     auto analysisOpt = analyzeProcedure(proc);
     if (!analysisOpt) {
-      signalPassFailure();
-      return;
-    }
-    ProcedureAnalysis analysis = *analysisOpt;
-
-    // If there are no conditional edges, record metadata and move on.
-    if (analysis.fpWidth == 0) {
-      Builder builder(context);
-      proc->setAttr("pcov.coverage.proc_index",
-                    builder.getI32IntegerAttr(procIndex));
-      proc->setAttr("pcov.coverage.fp_width", builder.getI32IntegerAttr(0));
-      ++procIndex;
+      if (encounteredFatalError)
+        return;
       continue;
     }
 
-    CoverageConfig config = buildCoverageConfig(context, analysis.fpWidth);
+    ProcedureAnalysis analysis = *analysisOpt;
+    CoverageConfig config = buildCoverageConfig(context, analysis.pathIdWidth);
     CoverageVars vars = getOrCreateCoverageVars(proc, procIndex, config);
-    if (!vars.isValid())
-      return;
+    if (!vars.isValid()) {
+      if (encounteredFatalError)
+        return;
+      continue;
+    }
 
     addCoverageEntryAndArguments(proc, config, analysis);
     rewriteTerminators(proc, config, analysis);
-    instrumentExitBlocks(proc, procIndex, vars, config, analysis,
-                         instrumentedAttr);
+    instrumentExitBlock(proc, procIndex, vars, instrumentedAttr, analysis);
+
+    Builder attrBuilder(context);
+    proc->setAttr("pcov.coverage.instrumented", instrumentedAttr);
+    proc->setAttr("pcov.coverage.kind", attrBuilder.getStringAttr("path"));
+    proc->setAttr("pcov.coverage.proc_index",
+                  attrBuilder.getI32IntegerAttr(procIndex));
+    proc->setAttr("pcov.coverage.path_id_width",
+                  attrBuilder.getI32IntegerAttr(config.pathIdWidth));
 
     ++procIndex;
   }
