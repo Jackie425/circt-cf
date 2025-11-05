@@ -39,13 +39,16 @@ def MooreInstrumentCoverage
 
 def MooreExportProcessCFG
     : Pass<"moore-export-process-cfg", "::circt::moore::SVModuleOp"> {
-  let summary = "Emit CFGs for each Moore procedure as Graphviz .dot files";
+  let summary = "Emit procedure CFGs as Graphviz .dot documents";
   let description = [{
-    Traverse every procedure inside a Moore module and materialize the control
-    flow graph as a Graphviz .dot document. Each basic block in the procedure
-    is represented as a single node and edges connect predecessor and successor
-    blocks in the Moore/CF control-flow graph. This pass is intended for
-    visualization and debugging purposes.
+    Traverse every Moore procedure with a synthesizable, edge-triggered wait
+    event and reuse the shared CFG analysis used by coverage instrumentation to
+    render a Graphviz .dot document. Each node represents a basic
+    block annotated with its path count and edges are labelled with the Ball-
+    Larus weight assigned during instrumentation. This pass is intended for
+    visualization and debugging. When the `output-dir` option is provided, the
+    graphs are written to that directory; otherwise they are printed to
+    stdout.
   }];
   let constructor = "circt::pcov::createMooreExportProcessCFGPass()";
   let dependentDialects = [
@@ -53,8 +56,9 @@ def MooreExportProcessCFG
     "mlir::cf::ControlFlowDialect"
   ];
   let options = [
-    Option<"outputDir", "output-dir", "std::string", "\".\"",
-           "Directory used to store the generated .dot files.">
+    Option<"outputDir", "output-dir", "std::string", "\"\"",
+           "Directory used to store the generated .dot files. If empty no "
+           "files are written.">
   ];
 }
 

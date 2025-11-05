@@ -4,6 +4,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "circt-cf/Instrumentation/MooreProcedureAnalysis.h"
 #include "circt-cf/Instrumentation/Passes.h"
 
 #include "circt/Dialect/Moore/MooreOps.h"
@@ -20,7 +21,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Casting.h"
-#include "llvm/Support/MathExtras.h"
 #include <cassert>
 #include <optional>
 #include <utility>
@@ -47,16 +47,6 @@ struct CoverageVars {
   bool isValid() const { return pathIdReg != nullptr; }
 };
 
-using EdgeKey = std::pair<Block *, Block *>;
-
-struct ProcedureAnalysis {
-  Block *entryBlock = nullptr;
-  Block *exitBlock = nullptr;
-  unsigned pathIdWidth = 0;
-  llvm::DenseMap<Block *, uint64_t> numPaths;
-  llvm::DenseMap<EdgeKey, uint64_t> weight;
-};
-
 class MooreInstrumentCoveragePass
     : public impl::MooreInstrumentCoverageBase<MooreInstrumentCoveragePass> {
 public:
@@ -65,21 +55,20 @@ public:
 private:
   CoverageConfig buildCoverageConfig(MLIRContext *context,
                                      unsigned pathIdWidth) const;
-  std::optional<ProcedureAnalysis> analyzeProcedure(moore::ProcedureOp proc);
   CoverageVars getOrCreateCoverageVars(moore::ProcedureOp proc,
                                        unsigned procIndex,
                                        const CoverageConfig &config);
 
   void addCoverageEntryAndArguments(moore::ProcedureOp proc,
                                     const CoverageConfig &config,
-                                    const ProcedureAnalysis &analysis);
+                                    const MooreProcedureCFGAnalysis &analysis);
   void rewriteTerminators(moore::ProcedureOp proc,
                           const CoverageConfig &config,
-                          const ProcedureAnalysis &analysis);
+                          const MooreProcedureCFGAnalysis &analysis);
   void instrumentExitBlock(moore::ProcedureOp proc, unsigned procIndex,
                            const CoverageVars &vars,
                            UnitAttr instrumentedAttr,
-                           const ProcedureAnalysis &analysis);
+                           const MooreProcedureCFGAnalysis &analysis);
 
   Value createConstant(OpBuilder &builder, Location loc, moore::IntType type,
                        const APInt &value) const;
@@ -88,34 +77,10 @@ private:
   Value accumulateForEdge(OpBuilder &builder, Location loc, Block *pred,
                           Block *succ, Value pathSum,
                           const CoverageConfig &config,
-                          const ProcedureAnalysis &analysis) const;
+                          const MooreProcedureCFGAnalysis &analysis) const;
 
-  bool encounteredFatalError = false;
   llvm::DenseMap<Operation *, CoverageVars> coverageVars;
 };
-
-namespace {
-
-static bool isEdgeTriggeredClock(moore::DetectEventOp detect) {
-  using moore::Edge;
-  switch (detect.getEdge()) {
-  case Edge::PosEdge:
-  case Edge::NegEdge:
-    return true;
-  default:
-    return false;
-  }
-}
-
-static bool hasEdgeTriggeredClock(moore::WaitEventOp waitEvent) {
-  bool hasClock = false;
-  waitEvent.getBody().walk([&](moore::DetectEventOp detect) {
-    hasClock |= isEdgeTriggeredClock(detect);
-  });
-  return hasClock;
-}
-
-} // namespace
 
 CoverageConfig
 MooreInstrumentCoveragePass::buildCoverageConfig(MLIRContext *context,
@@ -126,151 +91,6 @@ MooreInstrumentCoveragePass::buildCoverageConfig(MLIRContext *context,
   config.pathIdRefType =
       moore::RefType::get(llvm::cast<moore::UnpackedType>(config.pathIdType));
   return config;
-}
-
-std::optional<ProcedureAnalysis>
-MooreInstrumentCoveragePass::analyzeProcedure(moore::ProcedureOp proc) {
-  ProcedureAnalysis analysis;
-  Region &body = proc.getBody();
-  if (body.empty())
-    return std::nullopt;
-
-  analysis.entryBlock = &body.front();
-
-  auto waitEvent =
-      dyn_cast_or_null<moore::WaitEventOp>(analysis.entryBlock->empty()
-                                               ? nullptr
-                                               : &analysis.entryBlock->front());
-  if (!waitEvent || !hasEdgeTriggeredClock(waitEvent))
-    return std::nullopt;
-
-  for (Block &block : body) {
-    if (auto *term = block.getTerminator();
-        isa<moore::ReturnOp>(term)) {
-      if (analysis.exitBlock && analysis.exitBlock != &block) {
-        proc.emitError("procedure must have a unique return block for path "
-                       "coverage instrumentation");
-        signalPassFailure();
-        encounteredFatalError = true;
-        return std::nullopt;
-      }
-      analysis.exitBlock = &block;
-    }
-  }
-
-  if (!analysis.exitBlock) {
-    proc.emitError("procedure lacks a return block, cannot instrument path "
-                   "coverage");
-    signalPassFailure();
-    encounteredFatalError = true;
-    return std::nullopt;
-  }
-
-  llvm::DenseMap<Block *, llvm::SmallVector<Block *, 2>> successors;
-  llvm::DenseMap<Block *, unsigned> indegree;
-
-  for (Block &block : body) {
-    indegree.try_emplace(&block, 0);
-  }
-
-  auto recordEdge = [&](Block *from, Block *to) {
-    successors[from].push_back(to);
-    ++indegree[to];
-  };
-
-  for (Block &block : body) {
-    Operation *terminator = block.getTerminator();
-
-    if (auto cond = dyn_cast<cf::CondBranchOp>(terminator)) {
-      recordEdge(&block, cond.getTrueDest());
-      recordEdge(&block, cond.getFalseDest());
-      continue;
-    }
-    if (auto br = dyn_cast<cf::BranchOp>(terminator)) {
-      recordEdge(&block, br.getDest());
-      continue;
-    }
-    if (isa<moore::ReturnOp>(terminator))
-      continue;
-
-    terminator->emitError(
-        "unsupported terminator for path coverage instrumentation");
-    signalPassFailure();
-    encounteredFatalError = true;
-    return std::nullopt;
-  }
-
-  llvm::SmallVector<Block *, 16> worklist;
-  llvm::SmallVector<Block *, 16> topoOrder;
-  for (Block &block : body)
-    if (indegree.lookup(&block) == 0)
-      worklist.push_back(&block);
-
-  while (!worklist.empty()) {
-    Block *current = worklist.pop_back_val();
-    topoOrder.push_back(current);
-    for (Block *succ : successors[current]) {
-      unsigned &count = indegree[succ];
-      if (--count == 0)
-        worklist.push_back(succ);
-    }
-  }
-
-  if (topoOrder.size() != body.getBlocks().size()) {
-    proc.emitError("procedure contains intra-cycle backedges; expected a DAG");
-    signalPassFailure();
-    encounteredFatalError = true;
-    return std::nullopt;
-  }
-
-  llvm::SmallVector<Block *, 16> reverseTopo(topoOrder.rbegin(),
-                                             topoOrder.rend());
-  analysis.numPaths.try_emplace(analysis.exitBlock, 1);
-
-  for (Block *block : reverseTopo) {
-    if (block == analysis.exitBlock)
-      continue;
-
-    auto succIt = successors.find(block);
-    if (succIt == successors.end()) {
-      proc.emitError("block without successors cannot reach the unique exit");
-      signalPassFailure();
-      encounteredFatalError = true;
-      return std::nullopt;
-    }
-
-    uint64_t pathCount = 0;
-    for (Block *succ : succIt->second) {
-      auto numIt = analysis.numPaths.find(succ);
-      assert(numIt != analysis.numPaths.end() &&
-             "successor should already have a path count");
-      pathCount += numIt->second;
-    }
-    analysis.numPaths.try_emplace(block, pathCount);
-  }
-
-  auto entryIt = analysis.numPaths.find(analysis.entryBlock);
-  assert(entryIt != analysis.numPaths.end() &&
-         "entry block must have a path count");
-  uint64_t totalPaths = entryIt->second;
-  if (totalPaths == 0) {
-    proc.emitError("entry block has zero outgoing paths to exit");
-    signalPassFailure();
-    encounteredFatalError = true;
-    return std::nullopt;
-  }
-
-  for (Block *block : topoOrder) {
-    uint64_t base = 0;
-    for (Block *succ : successors[block]) {
-      analysis.weight.try_emplace(EdgeKey{block, succ}, base);
-      base += analysis.numPaths.lookup(succ);
-    }
-  }
-
-  analysis.pathIdWidth =
-      totalPaths == 1 ? 1 : llvm::Log2_64_Ceil(totalPaths);
-  return analysis;
 }
 
 CoverageVars MooreInstrumentCoveragePass::getOrCreateCoverageVars(
@@ -284,7 +104,6 @@ CoverageVars MooreInstrumentCoveragePass::getOrCreateCoverageVars(
   if (!module) {
     proc.emitError("expected procedure to be nested within a moore.module");
     signalPassFailure();
-    encounteredFatalError = true;
     return {};
   }
 
@@ -327,13 +146,12 @@ Value MooreInstrumentCoveragePass::createZeroConstant(OpBuilder &builder,
   return createConstant(builder, loc, type, APInt(type.getWidth(), 0));
 }
 
-Value MooreInstrumentCoveragePass::accumulateForEdge(OpBuilder &builder,
-                                                     Location loc, Block *pred,
-                                                     Block *succ, Value pathSum,
-                                                     const CoverageConfig &config,
-                                                     const ProcedureAnalysis &analysis) const {
-  auto it = analysis.weight.find(EdgeKey{pred, succ});
-  assert(it != analysis.weight.end() && "missing Ball-Larus edge weight");
+Value MooreInstrumentCoveragePass::accumulateForEdge(
+    OpBuilder &builder, Location loc, Block *pred, Block *succ, Value pathSum,
+    const CoverageConfig &config,
+    const MooreProcedureCFGAnalysis &analysis) const {
+  auto it = analysis.edgeWeights.find(BlockEdge{pred, succ});
+  assert(it != analysis.edgeWeights.end() && "missing Ball-Larus edge weight");
   uint64_t weightValue = it->second;
   if (weightValue == 0)
     return pathSum;
@@ -346,7 +164,7 @@ Value MooreInstrumentCoveragePass::accumulateForEdge(OpBuilder &builder,
 
 void MooreInstrumentCoveragePass::addCoverageEntryAndArguments(
     moore::ProcedureOp proc, const CoverageConfig &config,
-    const ProcedureAnalysis &analysis) {
+    const MooreProcedureCFGAnalysis &analysis) {
   Region &body = proc.getBody();
   Block &originalEntry = *analysis.entryBlock;
 
@@ -369,7 +187,7 @@ void MooreInstrumentCoveragePass::addCoverageEntryAndArguments(
 
 void MooreInstrumentCoveragePass::rewriteTerminators(
     moore::ProcedureOp proc, const CoverageConfig &config,
-    const ProcedureAnalysis &analysis) {
+    const MooreProcedureCFGAnalysis &analysis) {
   for (Block &block : proc.getBody()) {
     if (block.getNumArguments() == 0)
       continue;
@@ -422,7 +240,8 @@ void MooreInstrumentCoveragePass::rewriteTerminators(
 
 void MooreInstrumentCoveragePass::instrumentExitBlock(
     moore::ProcedureOp proc, unsigned procIndex, const CoverageVars &vars,
-    UnitAttr instrumentedAttr, const ProcedureAnalysis &analysis) {
+    UnitAttr instrumentedAttr,
+    const MooreProcedureCFGAnalysis &analysis) {
   if (!analysis.exitBlock)
     return;
 
@@ -431,7 +250,6 @@ void MooreInstrumentCoveragePass::instrumentExitBlock(
   if (!returnOp) {
     proc.emitError("expected the unique exit block to end with moore.return");
     signalPassFailure();
-    encounteredFatalError = true;
     return;
   }
 
@@ -449,29 +267,26 @@ void MooreInstrumentCoveragePass::instrumentExitBlock(
 }
 
 void MooreInstrumentCoveragePass::runOnOperation() {
-  encounteredFatalError = false;
-
   moore::SVModuleOp module = getOperation();
   MLIRContext *context = module.getContext();
   UnitAttr instrumentedAttr = UnitAttr::get(context);
 
   unsigned procIndex = 0;
   for (moore::ProcedureOp proc : module.getOps<moore::ProcedureOp>()) {
-    auto analysisOpt = analyzeProcedure(proc);
-    if (!analysisOpt) {
-      if (encounteredFatalError)
-        return;
-      continue;
+    MooreProcedureAnalysisResult analysisResult =
+        analyzeMooreProcedure(proc, /*emitDiagnostics=*/true);
+    if (analysisResult.fatalError) {
+      signalPassFailure();
+      return;
     }
+    if (!analysisResult.analysis)
+      continue;
 
-    ProcedureAnalysis analysis = *analysisOpt;
+    const MooreProcedureCFGAnalysis &analysis = *analysisResult.analysis;
     CoverageConfig config = buildCoverageConfig(context, analysis.pathIdWidth);
     CoverageVars vars = getOrCreateCoverageVars(proc, procIndex, config);
-    if (!vars.isValid()) {
-      if (encounteredFatalError)
-        return;
+    if (!vars.isValid())
       continue;
-    }
 
     addCoverageEntryAndArguments(proc, config, analysis);
     rewriteTerminators(proc, config, analysis);

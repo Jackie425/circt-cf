@@ -152,6 +152,17 @@ struct CLOptions {
       cl::desc("Detect memories and lower them to `seq.firmem`"),
       cl::init(true), cl::cat(cat)};
 
+  cl::opt<bool> emitMooreCfg{
+      "emit-moore-cfg",
+      cl::desc("Dump Moore procedure CFGs after instrumentation"),
+      cl::init(false), cl::cat(cat)};
+
+  cl::opt<std::string> emitMooreCfgDir{
+      "emit-moore-cfg-dir",
+      cl::desc("Directory where Moore CFG .dot files are written when "
+               "--emit-moore-cfg is enabled"),
+      cl::init(""), cl::cat(cat)};
+
   cl::opt<bool> splitVerilog{
       "split-verilog",
       cl::desc("Split output into one file per module (only for --sv-sv mode)"),
@@ -331,6 +342,13 @@ static void populateMooreTransforms(PassManager &pm) {
     modulePM.addPass(circt::pcov::optimize::moore::createNormalizeProceduresPass()); // opt pass for or1200
     modulePM.addPass(circt::pcov::optimize::moore::createFoldStaticRegistersPass());
     modulePM.addPass(circt::pcov::createMooreInstrumentCoveragePass());
+    if (opts.emitMooreCfg) {
+      if (!opts.emitMooreCfgDir.empty())
+        modulePM.addPass(
+            circt::pcov::createMooreExportProcessCFGPass(opts.emitMooreCfgDir));
+      else
+        modulePM.addPass(circt::pcov::createMooreExportProcessCFGPass());
+    }
     // Merge multiple always procedures with identical sensitivity lists that
     // write to non-overlapping variables or bit ranges. This reduces the
     // number of procedures in the IR, which can improve compilation time and

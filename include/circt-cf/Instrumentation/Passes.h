@@ -11,6 +11,7 @@
 #ifndef CIRCT_CF_INSTRUMENTATION_PASSES_H
 #define CIRCT_CF_INSTRUMENTATION_PASSES_H
 
+#include "llvm/ADT/StringRef.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 
@@ -31,6 +32,8 @@ std::unique_ptr<mlir::Pass> createMooreInstrumentCoveragePass();
 void registerMooreInstrumentCoveragePass();
 
 std::unique_ptr<mlir::Pass> createMooreExportProcessCFGPass();
+std::unique_ptr<mlir::Pass>
+createMooreExportProcessCFGPass(llvm::StringRef outputDir);
 void registerMooreExportProcessCFGPass();
 
 } // namespace pcov
