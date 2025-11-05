@@ -85,7 +85,7 @@ public:
 
 private:
   bool canConvertToAlwaysComb(ProcedureOp proc);
-  void convertToAlwaysComb(ProcedureOp proc);
+  bool convertToAlwaysComb(ProcedureOp proc, const std::string &moduleName);
 };
 
 bool NormalizeProceduresPass::canConvertToAlwaysComb(ProcedureOp proc) {
@@ -107,40 +107,26 @@ bool NormalizeProceduresPass::canConvertToAlwaysComb(ProcedureOp proc) {
   });
 
   if (hasSequentialFeatures) {
-    LLVM_DEBUG(llvm::dbgs() << "Procedure at " << proc.getLoc()
-                            << " has non-blocking assignments\n");
     return false;
   }
 
   SensitivityAnalyzer sensitivity;
-  if (!sensitivity.analyze(waitEvent)) {
-    LLVM_DEBUG(llvm::dbgs() << "Procedure at " << proc.getLoc()
-                            << " has no sensitivity list\n");
+  if (!sensitivity.analyze(waitEvent))
     return false;
-  }
 
   ReadAnalyzer reads;
   reads.analyze(proc.getBody());
 
   for (Value readVal : reads.readValues) {
     if (!sensitivity.covers(readVal)) {
-      LLVM_DEBUG({
-        llvm::dbgs() << "Procedure at " << proc.getLoc()
-                     << " reads value not in sensitivity list:\n";
-        llvm::dbgs() << "  Read value: " << readVal << "\n";
-        if (auto defOp = readVal.getDefiningOp())
-          llvm::dbgs() << "  Defined by: " << *defOp << "\n";
-      });
       return false;
     }
   }
-
-  LLVM_DEBUG(llvm::dbgs() << "Procedure at " << proc.getLoc()
-                          << " can be converted to always_comb\n");
   return true;
 }
 
-void NormalizeProceduresPass::convertToAlwaysComb(ProcedureOp proc) {
+bool NormalizeProceduresPass::convertToAlwaysComb(ProcedureOp proc,
+                                                  const std::string &moduleName) {
   OpBuilder builder(proc);
 
   Block &body = proc.getBody().front();
@@ -160,13 +146,28 @@ void NormalizeProceduresPass::convertToAlwaysComb(ProcedureOp proc) {
   proc->setAttr("kind",
                 ProcedureKindAttr::get(builder.getContext(),
                                         ProcedureKind::AlwaysComb));
+  std::string locStr;
+  llvm::raw_string_ostream os(locStr);
+  proc.getLoc().print(os);
+  os.flush();
 
-  LLVM_DEBUG(llvm::dbgs() << "Converted procedure to always_comb at "
-                          << proc.getLoc() << "\n");
+  std::string message = "NormalizeProcedures: converted ";
+  message += moduleName;
+  message += " @ ";
+  message += locStr;
+  message += "\n";
+  LLVM_DEBUG(llvm::dbgs() << message);
+
+  return true;
 }
 
 void NormalizeProceduresPass::runOnOperation() {
   auto module = getOperation();
+  auto moduleNameAttr = module.getSymNameAttr();
+  std::string moduleName =
+      (moduleNameAttr && !moduleNameAttr.getValue().empty())
+          ? moduleNameAttr.getValue().str()
+          : "<anonymous>";
 
   SmallVector<ProcedureOp> toConvert;
   module.walk([&](ProcedureOp proc) {
@@ -175,10 +176,7 @@ void NormalizeProceduresPass::runOnOperation() {
   });
 
   for (ProcedureOp proc : toConvert)
-    convertToAlwaysComb(proc);
-
-  LLVM_DEBUG(llvm::dbgs() << "Converted " << toConvert.size()
-                          << " procedures to always_comb\n");
+    convertToAlwaysComb(proc, moduleName);
 }
 
 } // namespace

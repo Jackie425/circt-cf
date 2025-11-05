@@ -16,8 +16,7 @@ namespace circt::pcov::optimize::moore {
 
 std::unique_ptr<mlir::Pass> createNormalizeProceduresPass();
 std::unique_ptr<mlir::Pass> createMergeProceduresPass();
-
-void registerMooreTransformPasses();
+std::unique_ptr<mlir::Pass> createFoldStaticRegistersPass();
 
 } // namespace circt::pcov::optimize::moore
 

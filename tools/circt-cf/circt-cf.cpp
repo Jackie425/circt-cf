@@ -329,6 +329,7 @@ static void populateMooreTransforms(PassManager &pm) {
     modulePM.addPass(moore::createLowerConcatRefPass());
 
     modulePM.addPass(circt::pcov::optimize::moore::createNormalizeProceduresPass()); // opt pass for or1200
+    modulePM.addPass(circt::pcov::optimize::moore::createFoldStaticRegistersPass());
     modulePM.addPass(circt::pcov::createMooreInstrumentCoveragePass());
     // Merge multiple always procedures with identical sensitivity lists that
     // write to non-overlapping variables or bit ranges. This reduces the

@@ -14,6 +14,7 @@
 #include "mlir/Pass/Pass.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 
 #define DEBUG_TYPE "llhd-mem-to-firmem"
@@ -65,10 +66,10 @@ public:
 private:
   bool analyzeSignal(cllhd::SignalOp sig, MultiPortMemPattern &pattern);
   bool analyzePort(cllhd::DriveOp drv, PortInfo &port);
-  void convertToFirMem(MultiPortMemPattern &pattern);
+  bool convertToFirMem(MultiPortMemPattern &pattern,
+                       SmallVectorImpl<Operation *> &opsToErase,
+                       const std::string &moduleName);
   std::optional<std::pair<uint64_t, uint64_t>> getArrayDimensions(Type type);
-
-  SmallVector<Operation *> opsToErase;
 };
 
 std::optional<std::pair<uint64_t, uint64_t>>
@@ -161,15 +162,11 @@ bool LLHDMemToFirMemPass::analyzeSignal(cllhd::SignalOp sig,
   return true;
 }
 
-void LLHDMemToFirMemPass::convertToFirMem(MultiPortMemPattern &pattern) {
-  auto sigName = pattern.signal.getName();
-
-  LLVM_DEBUG({
-    llvm::dbgs() << "[LLHDMemToFirMem] Converting signal '" << sigName << "' ("
-                 << pattern.depth << "x" << pattern.width
-                 << ") to seq.firmem with " << pattern.ports.size()
-                 << " port(s)\n";
-  });
+bool LLHDMemToFirMemPass::convertToFirMem(
+    MultiPortMemPattern &pattern, SmallVectorImpl<Operation *> &opsToErase,
+    const std::string &moduleName) {
+  if (pattern.ports.empty())
+    return false;
 
   ImplicitLocOpBuilder builder(pattern.signal.getLoc(), pattern.signal);
 
@@ -183,9 +180,6 @@ void LLHDMemToFirMemPass::convertToFirMem(MultiPortMemPattern &pattern) {
       /*init=*/cseq::FirMemInitAttr{}, /*prefix=*/StringAttr{},
       /*outputFile=*/Attribute{});
 
-  LLVM_DEBUG(llvm::dbgs() << "  - Created seq.firmem<" << pattern.depth << " x "
-                          << pattern.width << ">\n");
-
   cllhd::ProbeOp probe = nullptr;
   for (Operation *user : pattern.signal.getResult().getUsers()) {
     if (auto prb = dyn_cast<cllhd::ProbeOp>(user)) {
@@ -194,15 +188,15 @@ void LLHDMemToFirMemPass::convertToFirMem(MultiPortMemPattern &pattern) {
     }
   }
 
-  if (!probe) {
-    LLVM_DEBUG(llvm::dbgs() << "  - Warning: No probe found, skipping\n");
-    return;
-  }
+  if (!probe)
+    return false;
 
   SmallVector<chw::ArrayGetOp> allArrayGets;
   for (Operation *user : probe.getResult().getUsers())
     if (auto arrayGet = dyn_cast<chw::ArrayGetOp>(user))
       allArrayGets.push_back(arrayGet);
+
+  SmallVector<Operation *> localErase;
 
   for (size_t i = 0; i < pattern.ports.size(); ++i) {
     auto &port = pattern.ports[i];
@@ -213,16 +207,14 @@ void LLHDMemToFirMemPass::convertToFirMem(MultiPortMemPattern &pattern) {
                                       port.clock, port.writeEnable,
                                       port.writeData, mask);
 
-    LLVM_DEBUG(llvm::dbgs() << "  - Created write port " << i << "\n");
-
     (void)cseq::FirMemReadOp::create(builder, firMem, port.writeAddr,
                                      port.clock, /*enable=*/Value());
 
-    opsToErase.push_back(port.regOp);
-    opsToErase.push_back(port.arrayInject);
-    opsToErase.push_back(port.outerMux);
+    localErase.push_back(port.regOp);
+    localErase.push_back(port.arrayInject);
+    localErase.push_back(port.outerMux);
     if (port.innerMux)
-      opsToErase.push_back(port.innerMux);
+      localErase.push_back(port.innerMux);
   }
 
   if (!pattern.ports.empty() && !allArrayGets.empty()) {
@@ -233,29 +225,36 @@ void LLHDMemToFirMemPass::convertToFirMem(MultiPortMemPattern &pattern) {
                                      pattern.ports[0].clock,
                                      /*enable=*/Value());
 
-      LLVM_DEBUG(llvm::dbgs() << "  - Created read port for hw.array_get\n");
-
       arrayGet.getResult().replaceAllUsesWith(readData);
-      opsToErase.push_back(arrayGet);
+      localErase.push_back(arrayGet);
     }
   }
 
-  opsToErase.push_back(probe);
-  opsToErase.push_back(pattern.signal);
+  localErase.push_back(probe);
+  localErase.push_back(pattern.signal);
 
   for (Operation *user : pattern.signal.getResult().getUsers())
     if (auto drv = dyn_cast<cllhd::DriveOp>(user))
-      opsToErase.push_back(drv);
+      localErase.push_back(drv);
 
-  LLVM_DEBUG({
-    llvm::dbgs() << "  - Marked " << opsToErase.size()
-                 << " operations for removal (llhd.sig, llhd.prb, llhd.drv, "
-                 << "seq.firreg, hw.array_inject, comb.mux, hw.array_get)\n";
-  });
+  opsToErase.append(localErase.begin(), localErase.end());
+
+  std::string signalName = "<unnamed>";
+  if (auto nameAttr = pattern.signal.getNameAttr();
+      nameAttr && !nameAttr.getValue().empty())
+    signalName = nameAttr.getValue().str();
+
+  LLVM_DEBUG(llvm::dbgs() << "LLHDMemToFirMem: converted " << moduleName
+                          << "::" << signalName << "\n");
+
+  return true;
 }
 
 void LLHDMemToFirMemPass::runOnOperation() {
   auto module = getOperation();
+  auto moduleNameAttr = module.getModuleNameAttr();
+  std::string moduleName =
+      moduleNameAttr ? moduleNameAttr.getValue().str() : "<anonymous>";
 
   SmallVector<cllhd::SignalOp> signals;
 
@@ -266,13 +265,15 @@ void LLHDMemToFirMemPass::runOnOperation() {
         signals.push_back(sig);
   });
 
+  SmallVector<Operation *> opsToErase;
+
   for (auto sig : signals) {
     MultiPortMemPattern pattern;
     if (analyzeSignal(sig, pattern))
-      convertToFirMem(pattern);
+      convertToFirMem(pattern, opsToErase, moduleName);
   }
 
-  for (Operation *op : opsToErase) {
+  for (Operation *op : llvm::reverse(opsToErase)) {
     if (!op->use_empty())
       op->dropAllUses();
     op->erase();

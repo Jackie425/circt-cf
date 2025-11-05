@@ -30,4 +30,16 @@ def MergeProcedures : Pass<"moore-merge-procedures", "::circt::moore::SVModuleOp
       "circt::pcov::optimize::moore::createMergeProceduresPass()";
 }
 
+def FoldStaticRegisters : Pass<"moore-fold-static-registers", "::circt::moore::SVModuleOp"> {
+  let summary = "Fold sequential Moore variables that are statically constant";
+  let description = [{
+    Identify Moore variables which are only ever assigned the same constant
+    value (including along reset paths) and replace them with direct constant
+    drivers. This normalizes processes that otherwise keep redundant state and
+    interfere with later lowering passes.
+  }];
+  let constructor =
+      "circt::pcov::optimize::moore::createFoldStaticRegistersPass()";
+}
+
 #endif // CIRCT_CF_OPTIMIZE_MOORE_PASSES

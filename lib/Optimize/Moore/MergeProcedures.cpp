@@ -69,6 +69,14 @@ struct WriteTarget {
   }
 };
 
+static std::string describeProcedure(ProcedureOp proc) {
+  std::string locStr;
+  llvm::raw_string_ostream os(locStr);
+  proc.getLoc().print(os);
+  os.flush();
+  return locStr;
+}
+
 struct SensitivityListHash {
   llvm::hash_code hash;
   SmallVector<std::pair<Edge, Value>, 4> events;
@@ -264,42 +272,21 @@ void MergeProceduresPass::mergeProcedures(
     return;
 
   Operation *parentOp = procedures[0]->getParentOp();
-  std::string moduleName = "<unknown>";
+  std::string moduleName = "<anonymous>";
   while (parentOp) {
     if (auto modOp = dyn_cast<SVModuleOp>(parentOp)) {
-      moduleName = modOp.getSymName().str();
+      if (auto symNameAttr = modOp.getSymNameAttr();
+          symNameAttr && !symNameAttr.getValue().empty())
+        moduleName = symNameAttr.getValue().str();
       break;
     }
     parentOp = parentOp->getParentOp();
   }
 
-  LLVM_DEBUG({
-    llvm::dbgs() << "\n╔══════════════════════════════════════════════════════════\n";
-    llvm::dbgs() << "║ Merging " << procedures.size() << " procedures in @"
-                 << moduleName << "\n";
-    llvm::dbgs() << "╠══════════════════════════════════════════════════════════\n";
-    llvm::dbgs() << "║ Sensitivity: "
-                 << analyzers[0]->sensitivityHash.toString() << "\n";
-    llvm::dbgs() << "║ Assignment type: "
-                 << (analyzers[0]->isBlocking ? "blocking (=)"
-                                              : "non-blocking (<=)")
-                 << "\n";
-    llvm::dbgs() << "╠══════════════════════════════════════════════════════════\n";
-
-    for (size_t i = 0; i < analyzers.size(); ++i) {
-      llvm::dbgs() << "║ Procedure " << (i + 1) << " writes: ";
-      for (size_t j = 0; j < analyzers[i]->writeTargets.size(); ++j) {
-        if (j > 0)
-          llvm::dbgs() << ", ";
-        llvm::dbgs() << analyzers[i]->writeTargets[j].toString();
-      }
-      llvm::dbgs() << "\n";
-    }
-    llvm::dbgs() << "╠══════════════════════════════════════════════════════════\n";
-    llvm::dbgs() << "║ Merging into first procedure, removing "
-                 << (procedures.size() - 1) << " duplicate(s)\n";
-    llvm::dbgs() << "╚══════════════════════════════════════════════════════════\n";
-  });
+  SmallVector<std::string> procDescriptions;
+  procDescriptions.reserve(procedures.size());
+  for (auto proc : procedures)
+    procDescriptions.push_back(describeProcedure(proc));
 
   ProcedureOp targetProc = procedures[0];
   Block &targetBody = targetProc.getBody().front();
@@ -325,6 +312,19 @@ void MergeProceduresPass::mergeProcedures(
 
     srcProc.erase();
   }
+
+  LLVM_DEBUG({
+    std::string message = "MergeProcedures: merged ";
+    message += moduleName;
+    message += " @ ";
+    message += procDescriptions.front();
+    for (size_t i = 1; i < procDescriptions.size(); ++i) {
+      message += ", ";
+      message += procDescriptions[i];
+    }
+    message += "\n";
+    llvm::dbgs() << message;
+  });
 }
 
 void MergeProceduresPass::runOnOperation() {
@@ -393,32 +393,13 @@ void MergeProceduresPass::runOnOperation() {
     }
   }
 
-  LLVM_DEBUG({
-    if (totalMerged > 0) {
-      llvm::dbgs() << "\n╔══════════════════════════════════════════════════════════\n";
-      llvm::dbgs() << "║ SUMMARY: " << totalMerged << " procedure(s) merged\n";
-      llvm::dbgs() << "╚══════════════════════════════════════════════════════════\n\n";
-    }
-  });
+  (void)totalMerged;
 }
 
 } // namespace
 
 std::unique_ptr<mlir::Pass> createMergeProceduresPass() {
   return std::make_unique<MergeProceduresPass>();
-}
-
-void registerMooreTransformPasses() {
-  static bool initOnce = []() {
-    mlir::registerPass([]() -> std::unique_ptr<mlir::Pass> {
-      return createMergeProceduresPass();
-    });
-    mlir::registerPass([]() -> std::unique_ptr<mlir::Pass> {
-      return createNormalizeProceduresPass();
-    });
-    return true;
-  }();
-  (void)initOnce;
 }
 
 } // namespace circt::pcov::optimize::moore
