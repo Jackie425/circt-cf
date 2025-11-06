@@ -1,4 +1,4 @@
-# Simple entry points to exercise the CIRCT-CF pipeline on OR1200.
+# Simple entry points to exercise the CIRCT-CF pipeline on or1200.
 DESIGN ?= or1200
 BUILD_DIR := build
 CFG_DIR := $(BUILD_DIR)/cfg

@@ -1,35 +1,45 @@
-# simple Makefile to test a CIRCT flow from SystemVerilog to MLIR to SystemVerilog
+# Simple entry points to exercise the CIRCT-CF pipeline on b06.
 DESIGN ?= b06
-BUILD_DIR = build
+BUILD_DIR := build
+CFG_DIR := $(BUILD_DIR)/cfg
+SYNTH_DIR = $(BUILD_DIR)/synth
 
-# Debug options for LLVM_DEBUG output
-# Use --debug to see all debug output, or --debug-only=<type> for specific types
+CIRCT_CF ?= circt-cf
+CIRCT_CF_OPT ?= circt-cf-opt
 
 DEBUG_OPTS ?=
-# Example: make run DEBUG_OPTS="--debug-only=llhd-lower-processes"
-# Example: make run DEBUG_OPTS="--debug"
+
+CFG_ARGS := --emit-moore-cfg --emit-moore-cfg-dir=$(CFG_DIR)
 
 ######################################################################
+.PHONY: default run run-split clean
+
 default: run
 
 run:
-	mkdir -p $(BUILD_DIR)
-	circt-cf --ir-moore $(DESIGN).v -o build/$(DESIGN)_moore_cov.mlir \
-         --mlir-print-ir-before=moore-instrument-coverage \
-		 --mlir-print-ir-module-scope --mlir-disable-threading > build/$(DESIGN)_moore.mlir 2>&1
-	circt-cf --mlir-pretty-debuginfo --verbose-pass-executions $(DEBUG_OPTS) --ir-hw $(DESIGN).v -o $(BUILD_DIR)/$(DESIGN)_hw.mlir
-	circt-cf --mlir-pretty-debuginfo --verbose-pass-executions $(DEBUG_OPTS) --ir-sv $(DESIGN).v -o $(BUILD_DIR)/$(DESIGN)_sv.mlir
-	circt-cf --mlir-pretty-debuginfo --verbose-pass-executions $(DEBUG_OPTS) --sv-sv $(DESIGN).v -o $(BUILD_DIR)/$(DESIGN).sv
+	mkdir -p $(BUILD_DIR) $(CFG_DIR)
+	$(CIRCT_CF) --ir-moore $(DEBUG_OPTS) $(CFG_ARGS) \
+	  --mlir-print-ir-before=moore-instrument-coverage \
+	  $(DESIGN).v -o $(BUILD_DIR)/$(DESIGN)_moore_pcov.mlir 2> $(BUILD_DIR)/$(DESIGN)_moore.mlir
+	$(CIRCT_CF) --mlir-pretty-debuginfo --verbose-pass-executions \
+	  $(DEBUG_OPTS) $(CFG_ARGS) --ir-hw $(DESIGN).v \
+	  -o $(BUILD_DIR)/$(DESIGN)_hw.mlir
+	$(CIRCT_CF) --mlir-pretty-debuginfo --verbose-pass-executions \
+	  $(DEBUG_OPTS) $(CFG_ARGS) --ir-sv $(DESIGN).v \
+	  -o $(BUILD_DIR)/$(DESIGN)_sv.mlir
+	$(CIRCT_CF) --mlir-pretty-debuginfo --verbose-pass-executions \
+	  $(DEBUG_OPTS) $(CFG_ARGS) --sv-sv $(DESIGN).v \
+	  -o $(BUILD_DIR)/$(DESIGN).sv
 
 run-split:
-	mkdir -p $(BUILD_DIR)/split-output
-	circt-cf --verbose-pass-executions $(DEBUG_OPTS) --sv-sv --split-verilog --split-verilog-dir=$(BUILD_DIR)/split-output $(DESIGN).v
+	mkdir -p $(BUILD_DIR)/split-output $(CFG_DIR)
+	$(CIRCT_CF) --verbose-pass-executions $(DEBUG_OPTS) $(CFG_ARGS) --sv-sv \
+	  --split-verilog --split-verilog-dir=$(BUILD_DIR)/split-output \
+	  $(DESIGN).v
 
-graph:
-	circt-opt --hw-print-instance-graph $(BUILD_DIR)/$(DESIGN)_hw.mlir 2> $(BUILD_DIR)/$(DESIGN)_inst.dot
-	dot -Tpng $(BUILD_DIR)/$(DESIGN)_inst.dot -o $(BUILD_DIR)/$(DESIGN)_inst.png
-	circt-cf-opt --pass-pipeline='builtin.module(moore.module(moore-export-process-cfg{output-dir=$(BUILD_DIR)}))' $(BUILD_DIR)/$(DESIGN)_moore.mlir
-	dot -Tpng $(BUILD_DIR)/$(DESIGN)__proc0.dot -o $(BUILD_DIR)/$(DESIGN)_proc0.png
+synth: run
+	mkdir -p $(SYNTH_DIR)
+	yosys -Q -s synth.ys
 
 clean:
 	rm -rf $(BUILD_DIR)
