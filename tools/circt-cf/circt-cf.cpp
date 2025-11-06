@@ -341,6 +341,7 @@ static void populateMooreTransforms(PassManager &pm) {
 
     modulePM.addPass(circt::pcov::optimize::moore::createNormalizeProceduresPass()); // opt pass for or1200
     modulePM.addPass(circt::pcov::optimize::moore::createFoldStaticRegistersPass());
+    modulePM.addPass(circt::pcov::optimize::moore::createFoldConstantBranchesPass());
     modulePM.addPass(circt::pcov::createMooreInstrumentCoveragePass());
     if (opts.emitMooreCfg) {
       if (!opts.emitMooreCfgDir.empty())

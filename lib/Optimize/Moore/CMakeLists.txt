@@ -4,6 +4,7 @@ mlir_tablegen(circt-cf/Optimize/Moore/Passes.h.inc
 add_public_tablegen_target(CIRCTCFMoorePassIncGen)
 
 add_circt_library(CIRCTCFMooreTransforms
+  FoldConstantBranches.cpp
   FoldStaticRegisters.cpp
   MergeProcedures.cpp
   NormalizeProcedures.cpp
