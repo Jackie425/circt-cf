@@ -296,7 +296,7 @@ void MooreInstrumentCoveragePass::runOnOperation() {
     proc->setAttr("pcov.coverage.instrumented", instrumentedAttr);
     proc->setAttr("pcov.coverage.kind", attrBuilder.getStringAttr("path"));
     proc->setAttr("pcov.coverage.proc_index",
-                  attrBuilder.getI32IntegerAttr(procIndex));
+      attrBuilder.getI32IntegerAttr(procIndex));
     proc->setAttr("pcov.coverage.path_id_width",
                   attrBuilder.getI32IntegerAttr(config.pathIdWidth));
 

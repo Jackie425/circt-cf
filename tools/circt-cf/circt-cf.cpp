@@ -350,15 +350,6 @@ static void populateMooreTransforms(PassManager &pm) {
       else
         modulePM.addPass(circt::pcov::createMooreExportProcessCFGPass());
     }
-    // Merge multiple always procedures with identical sensitivity lists that
-    // write to non-overlapping variables or bit ranges. This reduces the
-    // number of procedures in the IR, which can improve compilation time and
-    // simplify later analysis. For example:
-    //   always @(posedge clk) out[30:0] <= ...;
-    //   always @(posedge clk) out[31] <= ...;
-    // Will be merged into a single procedure that writes all bits of 'out'.
-    // modulePM.addPass(
-    //     circt::pcov::optimize::moore::createMergeProceduresPass());
     
     // TODO: Enable the following once it not longer interferes with @(...)
     // event control checks. The introduced dummy variables make the event
@@ -367,6 +358,9 @@ static void populateMooreTransforms(PassManager &pm) {
     // modulePM.addPass(moore::createSimplifyProceduresPass());
     modulePM.addPass(mlir::createSROA());
   }
+
+  // Emit a design-wide coverage summary once module instrumentation completes.
+  pm.addPass(circt::pcov::createMooreSummarizeCoveragePass());
 
   {
     // Perform a final cleanup across all modules/functions.
@@ -704,6 +698,7 @@ int main(int argc, char **argv) {
   moore::registerPasses();
   circt::pcov::registerInsertHWProbePasses();
   circt::pcov::registerMooreInstrumentCoveragePass();
+  circt::pcov::registerMooreSummarizeCoveragePass();
   circt::pcov::registerMooreExportProcessCFGPass();
   registerMLIRContextCLOptions();
   registerPassManagerCLOptions();

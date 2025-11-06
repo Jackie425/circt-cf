@@ -46,9 +46,10 @@ int main(int argc, char **argv) {
   // DON'T call circt::registerAllPasses() here!
   // Only register the passes you actually need for testing
 
-  // Register ONLY your custom CFA trace passes
+  // Register ONLY your custom passes
   circt::pcov::registerInsertHWProbePasses();
   circt::pcov::registerMooreInstrumentCoveragePass();
+  circt::pcov::registerMooreSummarizeCoveragePass();
   circt::pcov::registerMooreExportProcessCFGPass();
   // If you need more custom passes in the future, add them here:
   // circt::pcov::registerOtherCustomPasses();

@@ -31,6 +31,9 @@ void registerInsertHWProbePasses();
 std::unique_ptr<mlir::Pass> createMooreInstrumentCoveragePass();
 void registerMooreInstrumentCoveragePass();
 
+std::unique_ptr<mlir::Pass> createMooreSummarizeCoveragePass();
+void registerMooreSummarizeCoveragePass();
+
 std::unique_ptr<mlir::Pass> createMooreExportProcessCFGPass();
 std::unique_ptr<mlir::Pass>
 createMooreExportProcessCFGPass(llvm::StringRef outputDir);

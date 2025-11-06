@@ -37,6 +37,20 @@ def MooreInstrumentCoverage
   ];
 }
 
+def MooreSummarizeCoverage
+    : Pass<"moore-summarize-coverage", "::mlir::ModuleOp"> {
+  let summary = "Summarize Moore coverage instrumentation across the design";
+  let description = [{
+    Collect coverage attributes produced by the Moore instrumentation pass and
+    print a design-wide report that enumerates instrumented procedures and
+    aggregates their path identifier widths.
+  }];
+  let constructor = "circt::pcov::createMooreSummarizeCoveragePass()";
+  let dependentDialects = [
+    "circt::moore::MooreDialect"
+  ];
+}
+
 def MooreExportProcessCFG
     : Pass<"moore-export-process-cfg", "::circt::moore::SVModuleOp"> {
   let summary = "Emit procedure CFGs as Graphviz .dot documents";

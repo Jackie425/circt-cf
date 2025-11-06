@@ -7,6 +7,7 @@ add_circt_library(CIRCTCFInstrumentation
   InsertHWProbe.cpp
   MooreExportProcessCFG.cpp
   MooreInstrumentCoverage.cpp
+  MooreSummarizeCoverage.cpp
   MooreProcedureAnalysis.cpp
 
   DEPENDS
