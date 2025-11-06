@@ -12,6 +12,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
@@ -187,13 +188,25 @@ LogicalResult MooreExportProcessCFGPass::emitProcedureCFG(
 
   llvm::DenseMap<Block *, std::string> blockNames;
   llvm::SmallVector<Block *> blockOrder;
-  unsigned blockIndex = 0;
-  for (Block *block : analysis.topoOrder) {
-    std::string blockName = (Twine("bb") + Twine(blockIndex)).str();
-    blockOrder.push_back(block);
-    blockNames.try_emplace(block, std::move(blockName));
-    ++blockIndex;
+  for (Block &block : proc.getBody()) {
+    Block *blockPtr = &block;
+    if (!analysis.numPaths.contains(blockPtr))
+      continue;
+    blockOrder.push_back(blockPtr);
   }
+
+  if (!blockOrder.empty()) {
+    auto entryPos =
+        llvm::find(blockOrder, analysis.entryBlock);
+    if (entryPos != blockOrder.end())
+      blockOrder.erase(blockOrder.begin(), entryPos);
+  }
+
+  blockNames.reserve(blockOrder.size());
+  unsigned blockIndex = 0;
+  for (Block *blockPtr : blockOrder)
+    blockNames.try_emplace(
+        blockPtr, (Twine("bb") + Twine(blockIndex++)).str());
 
   uint64_t totalPaths = analysis.numPaths.lookup(analysis.entryBlock);
   auto renderGraph = [&](raw_ostream &os) {
