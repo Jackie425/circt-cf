@@ -2,6 +2,7 @@
 DESIGN ?= or1200
 BUILD_DIR := build
 CFG_DIR := $(BUILD_DIR)/cfg
+SYNTH_DIR = $(BUILD_DIR)/synth
 
 CIRCT_CF ?= circt-cf
 CIRCT_CF_OPT ?= circt-cf-opt
@@ -11,7 +12,7 @@ DEBUG_OPTS ?=
 CFG_ARGS := --emit-moore-cfg --emit-moore-cfg-dir=$(CFG_DIR)
 
 ######################################################################
-.PHONY: default run run-split clean
+.PHONY: default run run-base run-split clean
 
 default: run
 
@@ -30,11 +31,21 @@ run:
 	  $(DEBUG_OPTS) $(CFG_ARGS) --sv-sv -C $(DESIGN).f \
 	  -o $(BUILD_DIR)/$(DESIGN).sv
 
+run-base:
+	mkdir -p $(BUILD_DIR)
+	$(CIRCT_CF) --mlir-pretty-debuginfo --verbose-pass-executions \
+	  $(DEBUG_OPTS) --disable-pcov-instrumentation --sv-sv -C $(DESIGN).f \
+	  -o $(BUILD_DIR)/$(DESIGN)_base.sv
+
 run-split:
 	mkdir -p $(BUILD_DIR)/split-output $(CFG_DIR)
 	$(CIRCT_CF) --verbose-pass-executions $(DEBUG_OPTS) $(CFG_ARGS) --sv-sv \
 	  --split-verilog --split-verilog-dir=$(BUILD_DIR)/split-output \
 	  -C $(DESIGN).f
+
+synth: run run-base
+	mkdir -p $(SYNTH_DIR)
+	yosys -Q -s synth.ys
 
 clean:
 	rm -rf $(BUILD_DIR)

@@ -110,6 +110,11 @@ struct CLOptions {
       cl::desc("Print passes as they are being executed"), cl::init(false),
       cl::cat(cat)};
 
+  cl::opt<bool> disablePcovInstrumentation{
+      "disable-pcov-instrumentation",
+      cl::desc("Disable Moore coverage instrumentation passes"),
+      cl::init(false), cl::cat(cat)};
+
   cl::opt<LoweringMode> loweringMode{
       cl::desc("Specify how to process the input:"),
       cl::values(
@@ -349,14 +354,15 @@ static void populateMooreTransforms(PassManager &pm) {
     // modulePM.addPass(moore::createSimplifyProceduresPass());
   }
 
-  pm.addPass(circt::pcov::createMooreInstrumentCoveragePass());
+  if (!opts.disablePcovInstrumentation)
+    pm.addPass(circt::pcov::createMooreInstrumentCoveragePass());
   {
     auto &modulePM = pm.nest<moore::SVModuleOp>();
     modulePM.addPass(mlir::createSROA());
   }
 
-  // Emit a design-wide coverage summary once module instrumentation completes.
-  pm.addPass(circt::pcov::createMooreSummarizeCoveragePass());
+  if (!opts.disablePcovInstrumentation)
+    pm.addPass(circt::pcov::createMooreSummarizeCoveragePass());
 
   {
     // Perform a final cleanup across all modules/functions.

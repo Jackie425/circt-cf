@@ -1,0 +1,17 @@
+# Minimal Yosys script to grab LUT/FF/BRAM/DSP counts for the OR1200 design
+# before and after pcov instrumentation. Both inputs come from the CIRCT-CF
+# pipeline to ensure a fair comparison.
+
+# No-coverage structural netlist
+design -reset
+read_verilog -sv build/or1200_base.sv
+synth_xilinx -family xcup -flatten -top or1200_top
+tee -q -o build/synth/or1200_base.json stat -json
+tee -o build/synth/or1200_base.rpt stat -tech xilinx
+
+# Instrumented structural netlist
+design -reset
+read_verilog -sv build/or1200.sv
+synth_xilinx -family xcup -flatten -top or1200_top
+tee -q -o build/synth/or1200_instrumented.json stat -json
+tee -o build/synth/or1200_instrumented.rpt stat -tech xilinx
