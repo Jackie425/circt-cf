@@ -342,20 +342,16 @@ static void populateMooreTransforms(PassManager &pm) {
     modulePM.addPass(circt::pcov::optimize::moore::createNormalizeProceduresPass()); // opt pass for or1200
     modulePM.addPass(circt::pcov::optimize::moore::createFoldStaticRegistersPass());
     modulePM.addPass(circt::pcov::optimize::moore::createFoldConstantBranchesPass());
-    modulePM.addPass(circt::pcov::createMooreInstrumentCoveragePass());
-    if (opts.emitMooreCfg) {
-      if (!opts.emitMooreCfgDir.empty())
-        modulePM.addPass(
-            circt::pcov::createMooreExportProcessCFGPass(opts.emitMooreCfgDir));
-      else
-        modulePM.addPass(circt::pcov::createMooreExportProcessCFGPass());
-    }
-    
     // TODO: Enable the following once it not longer interferes with @(...)
     // event control checks. The introduced dummy variables make the event
     // control observe a static local variable that never changes, instead of
     // observing a module-wide signal.
     // modulePM.addPass(moore::createSimplifyProceduresPass());
+  }
+
+  pm.addPass(circt::pcov::createMooreInstrumentCoveragePass());
+  {
+    auto &modulePM = pm.nest<moore::SVModuleOp>();
     modulePM.addPass(mlir::createSROA());
   }
 
@@ -368,6 +364,15 @@ static void populateMooreTransforms(PassManager &pm) {
     anyPM.addPass(mlir::createMem2Reg());
     anyPM.addPass(mlir::createCSEPass());
     anyPM.addPass(mlir::createCanonicalizerPass());
+  }
+
+  if (opts.emitMooreCfg) {
+    auto &cfgPM = pm.nest<moore::SVModuleOp>();
+    if (!opts.emitMooreCfgDir.empty())
+      cfgPM.addPass(
+          circt::pcov::createMooreExportProcessCFGPass(opts.emitMooreCfgDir));
+    else
+      cfgPM.addPass(circt::pcov::createMooreExportProcessCFGPass());
   }
 }
 

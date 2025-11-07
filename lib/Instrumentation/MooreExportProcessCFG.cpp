@@ -3,6 +3,7 @@
 
 #include "circt/Dialect/Moore/MooreOps.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/SymbolTable.h"
@@ -11,8 +12,8 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/ADT/Twine.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
@@ -195,18 +196,27 @@ LogicalResult MooreExportProcessCFGPass::emitProcedureCFG(
     blockOrder.push_back(blockPtr);
   }
 
-  if (!blockOrder.empty()) {
-    auto entryPos =
-        llvm::find(blockOrder, analysis.entryBlock);
-    if (entryPos != blockOrder.end())
-      blockOrder.erase(blockOrder.begin(), entryPos);
+  blockNames.reserve(blockOrder.size());
+  mlir::AsmState asmState(module);
+  unsigned fallbackIndex = 0;
+  for (Block *blockPtr : blockOrder) {
+    std::string buffer;
+    {
+      llvm::raw_string_ostream os(buffer);
+      blockPtr->printAsOperand(os, asmState);
+    }
+    if (!buffer.empty() && buffer.front() == '^')
+      buffer.erase(buffer.begin());
+    if (buffer.empty())
+      buffer = (Twine("bb") + Twine(fallbackIndex)).str();
+    blockNames.try_emplace(blockPtr, buffer);
+    ++fallbackIndex;
   }
 
-  blockNames.reserve(blockOrder.size());
-  unsigned blockIndex = 0;
-  for (Block *blockPtr : blockOrder)
-    blockNames.try_emplace(
-        blockPtr, (Twine("bb") + Twine(blockIndex++)).str());
+#if 0
+  llvm::errs() << "[pcov-cfg] module " << moduleSymbol << " proc#" << procIndex
+               << " blocks=" << blockOrder.size() << "\n";
+#endif
 
   uint64_t totalPaths = analysis.numPaths.lookup(analysis.entryBlock);
   auto renderGraph = [&](raw_ostream &os) {

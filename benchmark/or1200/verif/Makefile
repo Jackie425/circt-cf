@@ -4,7 +4,7 @@
 
 .DEFAULT_GOAL := run
 .SUFFIXES:
-.PHONY: all run sim info dis wave clean clean-sim clean-all \
+.PHONY: all run sim info dis wave clean \
         build-% format-help
 
 PROGS := program coremark
@@ -115,12 +115,6 @@ wave:
 clean:
 	@$(MAKE) -C $(OR1K_DIR)/program clean
 	@$(MAKE) -C $(OR1K_DIR)/coremark clean
-	@rm -f $(TRACE_FILE)
-
-clean-sim:
-	@rm -rf $(OBJ_DIR)
-
-clean-all: clean clean-sim
 	@rm -rf $(BUILD_DIR)
 
 ################################################################################

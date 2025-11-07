@@ -53,6 +53,8 @@ module or1200_tb_top (
     logic        pm_tt_gate, pm_cpu_gate, pm_wakeup, pm_lvolt;
     logic        sig_tick;
 
+    logic [244:0] pcov_path;
+
     // Initialize control signals
     initial begin
         pic_ints = 20'h0;
@@ -212,7 +214,9 @@ module or1200_tb_top (
         .pm_cpu_gate_o(pm_cpu_gate),
         .pm_wakeup_o(pm_wakeup),
         .pm_lvolt_o(pm_lvolt),
-        .sig_tick(sig_tick)
+        .sig_tick(sig_tick),
+
+        .pcov_path(pcov_path)
     );
 
     // Monitor for debugging

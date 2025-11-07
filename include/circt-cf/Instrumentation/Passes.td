@@ -21,7 +21,7 @@ def InsertHWProbe : Pass<"insert-hw-probes", "::mlir::ModuleOp"> {
 }
 
 def MooreInstrumentCoverage
-    : Pass<"moore-instrument-coverage", "::circt::moore::SVModuleOp"> {
+    : Pass<"moore-instrument-coverage", "::mlir::ModuleOp"> {
   let summary = "Insert coverage bookkeeping into Moore procedures";
   let description = [{
     Identify leaf basic blocks within Moore procedures and insert coverage
