@@ -19,7 +19,12 @@ module or1200_tb_top (
     logic [1:0]  clmode;
     
     // Instruction Wishbone signals
-    logic        iwb_cyc, iwb_stb, iwb_we, iwb_ack, iwb_err, iwb_rty;
+    logic        iwb_cyc /* verilator public */,
+                 iwb_stb /* verilator public */,
+                 iwb_we  /* verilator public */,
+                 iwb_ack /* verilator public */,
+                 iwb_err,
+                 iwb_rty;
     logic [31:0] iwb_adr, iwb_dat_i, iwb_dat_o;
     logic [3:0]  iwb_sel;
     logic [2:0]  iwb_cti;
@@ -54,8 +59,8 @@ module or1200_tb_top (
     logic        sig_tick;
 
     logic [244:0] pcov_path;
+    logic [7:0]   pcov_covsum /* verilator public */;
     logic         pcov_meta_reset;
-    logic [7:0]   pcov_covsum;
     // Initialize control signals
     initial begin
         pic_ints = 20'h0;

@@ -24,6 +24,7 @@ constexpr vluint64_t kHalfPeriodPs      = 5;      // 10 ns full period => 100 MH
 constexpr vluint64_t kResetReleaseTime  = 50;     // 5 cycles
 constexpr vluint64_t kProgressInterval  = 1'000'000'000ULL;  // every 100M cycles
 constexpr vluint64_t kMaxSimTime        = 500'000'000'000'000ULL;
+constexpr vluint64_t kCovLogIntervalCycles = 1000ULL;
 
 #ifndef PROGRAM_ELF
 #error "PROGRAM_ELF must be defined to point at the software ELF image"
@@ -218,6 +219,11 @@ int main(int argc, char **argv) {
     vluint64_t finish_time = 0;
 
     vluint64_t main_time = 0;
+    vluint64_t cycle_count = 0;
+    std::uint64_t instr_count = 0;
+    std::FILE *covsum_log = std::fopen("covsum_log.csv", "w");
+    if (covsum_log)
+        std::fprintf(covsum_log, "cycle,instructions,covsum\n");
     std::puts("Starting OR1200 simulation");
 
     while (!Verilated::gotFinish() && main_time < kMaxSimTime && !program_finished) {
@@ -225,6 +231,7 @@ int main(int argc, char **argv) {
             top->clk = 0;
         } else if ((main_time % (2 * kHalfPeriodPs)) == 0) {
             top->clk = 1;
+            ++cycle_count;
 
             if (main_time == kResetReleaseTime) {
                 top->rst = 0;
@@ -234,6 +241,11 @@ int main(int argc, char **argv) {
             if (main_time != 0 && (main_time % kProgressInterval) == 0) {
                 std::printf("[%" PRIu64 "] cycle=%" PRIu64 "\n", main_time,
                             main_time / (2 * kHalfPeriodPs));
+            }
+
+            if (top->or1200_tb_top->iwb_cyc && top->or1200_tb_top->iwb_stb &&
+                top->or1200_tb_top->iwb_ack) {
+                ++instr_count;
             }
 
             if (top->or1200_tb_top->dwb_cyc && top->or1200_tb_top->dwb_stb &&
@@ -251,6 +263,15 @@ int main(int argc, char **argv) {
                         exit_code = 1;
                     }
                 }
+            }
+
+            if (covsum_log && (cycle_count % kCovLogIntervalCycles) == 0 &&
+                !top->rst) {
+                std::fprintf(covsum_log, "%" PRIu64 ",%" PRIu64 ",%u\n",
+                             cycle_count, instr_count,
+                             static_cast<unsigned>(
+                                 top->or1200_tb_top->pcov_covsum));
+                std::fflush(covsum_log);
             }
         }
 
@@ -277,5 +298,7 @@ int main(int argc, char **argv) {
 #ifdef TRACE_ENABLED
     trace->close();
 #endif
+    if (covsum_log)
+        std::fclose(covsum_log);
     return exit_code;
 }
