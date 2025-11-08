@@ -24,7 +24,7 @@ constexpr vluint64_t kHalfPeriodPs      = 5;      // 10 ns full period => 100 MH
 constexpr vluint64_t kResetReleaseTime  = 50;     // 5 cycles
 constexpr vluint64_t kProgressInterval  = 1'000'000'000ULL;  // every 100M cycles
 constexpr vluint64_t kMaxSimTime        = 500'000'000'000'000ULL;
-constexpr vluint64_t kCovLogIntervalCycles = 1000ULL;
+constexpr vluint64_t kCovLogIntervalCycles = 5ULL;
 
 #ifndef PROGRAM_ELF
 #error "PROGRAM_ELF must be defined to point at the software ELF image"

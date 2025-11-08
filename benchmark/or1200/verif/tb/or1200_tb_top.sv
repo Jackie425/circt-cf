@@ -59,7 +59,7 @@ module or1200_tb_top (
     logic        sig_tick;
 
     logic [244:0] pcov_path;
-    logic [7:0]   pcov_covsum /* verilator public */;
+    logic [9:0]   pcov_covsum /* verilator public */;
     logic         pcov_meta_reset;
     // Initialize control signals
     initial begin

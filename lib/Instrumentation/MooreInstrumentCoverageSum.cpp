@@ -39,6 +39,8 @@ static constexpr StringLiteral covCountKind = "path_covcount";
 static constexpr StringLiteral covCountPointAttr =
     "pcov.coverage.point_count";
 static constexpr StringLiteral covSumPortName = "pcov_covsum";
+static constexpr StringLiteral totalCovPointsAttr =
+    "pcov.coverage.total_cov_points";
 
 enum class VisitState { Visiting, Visited };
 
@@ -285,6 +287,7 @@ void MooreInstrumentCoverageSumPass::runOnOperation() {
   ModuleOp top = getOperation();
   MLIRContext *context = top.getContext();
   covSumPortNameAttr = StringAttr::get(context, covSumPortName);
+  Builder attrBuilder(context);
 
   gatherModuleInfo(top);
   if (modules.empty())
@@ -298,6 +301,12 @@ void MooreInstrumentCoverageSumPass::runOnOperation() {
   llvm::DenseMap<Operation *, VisitState> visitState;
   for (moore::SVModuleOp module : modules)
     computeAggregatePoints(module, visitState, moduleLookup);
+
+  for (moore::SVModuleOp module : modules) {
+    ModuleCovSumInfo &info = moduleInfos[module.getOperation()];
+    module->setAttr(totalCovPointsAttr,
+                    attrBuilder.getI64IntegerAttr(info.aggregatePointCount));
+  }
 
   llvm::DenseMap<Operation *, Value> instanceCovSignals;
 

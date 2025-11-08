@@ -26,6 +26,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <optional>
+#include <limits>
 
 using namespace mlir;
 using namespace circt;
@@ -77,6 +78,7 @@ struct ProcBitmapInfo {
   moore::IntType pathIdType;
   moore::RefType pathIdRefType;
   unsigned procIndex = 0;
+  uint64_t pointCount = 0;
 };
 
 struct ModuleBitmapInfo {
@@ -176,6 +178,9 @@ void MooreInstrumentPathBitmapPass::gatherModuleInfo(ModuleOp top) {
       procInfo.pathIdType = pathIdType;
       procInfo.pathIdRefType = refType;
       procInfo.procIndex = indexAttr.getInt();
+      if (auto pointAttr = procInfo.proc->getAttrOfType<IntegerAttr>(
+              "pcov.coverage.point_count"))
+        procInfo.pointCount = pointAttr.getInt();
       info.procs.push_back(procInfo);
     }
 
@@ -420,6 +425,38 @@ LogicalResult MooreInstrumentPathBitmapPass::buildBitmapController(
     return failure();
   }
 
+  uint64_t totalPaths = procInfo.pointCount;
+  if (totalPaths == 0 && analysisResult.analysis) {
+    auto it = analysisResult.analysis->numPaths.find(
+        analysisResult.analysis->entryBlock);
+    if (it != analysisResult.analysis->numPaths.end())
+      totalPaths = it->second;
+  }
+  if (totalPaths == 0)
+    totalPaths = 1;
+
+  unsigned bitmapWidth = 0;
+  if (totalPaths > std::numeric_limits<unsigned>::max()) {
+    bitmapWidth = std::numeric_limits<unsigned>::max();
+    moduleInfo.module.emitWarning()
+        << "coverage point count exceeds supported bitmap width; "
+        << "clamping to " << bitmapWidth;
+  } else {
+    bitmapWidth = static_cast<unsigned>(totalPaths);
+  }
+
+  moore::IntType bitmapType =
+      moore::IntType::getLogic(context, std::max(1u, bitmapWidth));
+  auto bitmapRefType =
+      moore::RefType::get(llvm::cast<moore::UnpackedType>(bitmapType));
+
+  unsigned countWidth =
+      std::max(1u, llvm::Log2_64_Ceil(totalPaths + 1));
+  moore::IntType countType =
+      moore::IntType::getLogic(context, countWidth);
+  auto countRefType =
+      moore::RefType::get(llvm::cast<moore::UnpackedType>(countType));
+
   Value bitmapZero;
   {
     if (isDebugEnabled())
@@ -429,13 +466,11 @@ LogicalResult MooreInstrumentPathBitmapPass::buildBitmapController(
                    .str());
     OpBuilder builder(moduleInfo.module);
     builder.setInsertionPointAfter(pathIdVar.getOperation());
-    bitmapZero = createZeroConstant(builder, sourceProc.getLoc(),
-                                    procInfo.pathIdType);
-    auto refType = procInfo.pathIdRefType;
+    bitmapZero = createZeroConstant(builder, sourceProc.getLoc(), bitmapType);
     auto bitmapName =
         (Twine("cov_proc") + Twine(procInfo.procIndex) + "_bitmap_reg").str();
     Value bitmapReg = moore::VariableOp::create(
-        builder, sourceProc.getLoc(), refType,
+        builder, sourceProc.getLoc(), bitmapRefType,
         builder.getStringAttr(bitmapName), bitmapZero);
     bitmapReg.getDefiningOp()->setAttr("pcov.coverage.kind",
                                        builder.getStringAttr(bitmapKind));
@@ -446,15 +481,6 @@ LogicalResult MooreInstrumentPathBitmapPass::buildBitmapController(
         "pcov.coverage.path_id_width",
         builder.getI32IntegerAttr(procInfo.pathIdType.getWidth()));
 
-    unsigned pointCount = procInfo.pathIdType.getWidth();
-    if (pointCount == 0)
-      pointCount = 1;
-    unsigned countWidth =
-        std::max(1u, llvm::Log2_64_Ceil(static_cast<uint64_t>(pointCount) + 1));
-    moore::IntType countType =
-        moore::IntType::getLogic(context, countWidth);
-    auto countRefType =
-        moore::RefType::get(llvm::cast<moore::UnpackedType>(countType));
     Value countZero =
         createZeroConstant(builder, sourceProc.getLoc(), countType);
     auto countName =
@@ -469,7 +495,7 @@ LogicalResult MooreInstrumentPathBitmapPass::buildBitmapController(
         builder.getI32IntegerAttr(static_cast<int32_t>(procInfo.procIndex)));
     countReg.getDefiningOp()->setAttr(
         covCountPointAttr,
-        builder.getI32IntegerAttr(static_cast<int32_t>(pointCount)));
+        builder.getI64IntegerAttr(static_cast<int64_t>(totalPaths)));
 
     OpBuilder procBuilder(moduleInfo.module);
     procBuilder.setInsertionPointAfter(sourceProc);
@@ -531,23 +557,22 @@ LogicalResult MooreInstrumentPathBitmapPass::buildBitmapController(
     {
       OpBuilder updateBuilder(updateBlock, updateBlock->begin());
       Value currentBitmap =
-          moore::ReadOp::create(updateBuilder, procOp.getLoc(),
-                                procInfo.pathIdType, bitmapReg);
+          moore::ReadOp::create(updateBuilder, procOp.getLoc(), bitmapType,
+                                bitmapReg);
       Value pathId = moore::ReadOp::create(updateBuilder, procOp.getLoc(),
                                            procInfo.pathIdType,
                                            pathIdVar.getResult());
-      Value one = createConstant(updateBuilder, procOp.getLoc(),
-                                 procInfo.pathIdType,
-                                 llvm::APInt(procInfo.pathIdType.getWidth(), 1));
+      Value one = createConstant(updateBuilder, procOp.getLoc(), bitmapType,
+                                 llvm::APInt(bitmapType.getWidth(), 1));
       Value shifted = moore::ShlOp::create(updateBuilder, procOp.getLoc(),
-                                           procInfo.pathIdType, one, pathId);
+                                           bitmapType, one, pathId);
       Value nextBitmap =
-          moore::OrOp::create(updateBuilder, procOp.getLoc(),
-                              procInfo.pathIdType, currentBitmap, shifted);
+          moore::OrOp::create(updateBuilder, procOp.getLoc(), bitmapType,
+                              currentBitmap, shifted);
 
       Value alreadySet = moore::AndOp::create(updateBuilder, procOp.getLoc(),
-                                              procInfo.pathIdType,
-                                              currentBitmap, shifted);
+                                              bitmapType, currentBitmap,
+                                              shifted);
       Value isNewBit =
           moore::EqOp::create(updateBuilder, procOp.getLoc(), alreadySet,
                               bitmapZero);

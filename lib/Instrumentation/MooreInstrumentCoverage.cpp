@@ -240,12 +240,24 @@ MooreInstrumentCoveragePass::instrumentModule(moore::SVModuleOp module,
     rewriteTerminators(proc, config, analysis);
     instrumentExitBlock(proc, procIndex, vars, instrumentedAttr, analysis);
 
+    uint64_t totalPaths = 0;
+    if (auto it = analysis.numPaths.find(analysis.entryBlock);
+        it != analysis.numPaths.end())
+      totalPaths = it->second;
+    if (totalPaths == 0)
+      totalPaths = 1;
+
     proc->setAttr("pcov.coverage.instrumented", instrumentedAttr);
     proc->setAttr("pcov.coverage.kind", attrBuilder.getStringAttr("path"));
     proc->setAttr("pcov.coverage.proc_index",
                   attrBuilder.getI32IntegerAttr(procIndex));
     proc->setAttr("pcov.coverage.path_id_width",
                   attrBuilder.getI32IntegerAttr(config.pathIdWidth));
+    proc->setAttr("pcov.coverage.point_count",
+                  attrBuilder.getI64IntegerAttr(totalPaths));
+    vars.pathIdReg.getDefiningOp()->setAttr(
+        "pcov.coverage.point_count",
+        attrBuilder.getI64IntegerAttr(totalPaths));
 
     info.localRegs.push_back(LocalCoverageReg{vars.pathIdReg});
     info.localWidth += config.pathIdWidth;
