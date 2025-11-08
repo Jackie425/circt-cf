@@ -354,8 +354,10 @@ static void populateMooreTransforms(PassManager &pm) {
     // modulePM.addPass(moore::createSimplifyProceduresPass());
   }
 
-  if (!opts.disablePcovInstrumentation)
+  if (!opts.disablePcovInstrumentation) {
     pm.addPass(circt::pcov::createMooreInstrumentCoveragePass());
+    pm.addPass(circt::pcov::createMooreInstrumentPathBitmapPass());
+  }
   {
     auto &modulePM = pm.nest<moore::SVModuleOp>();
     modulePM.addPass(mlir::createSROA());
@@ -372,14 +374,15 @@ static void populateMooreTransforms(PassManager &pm) {
     anyPM.addPass(mlir::createCanonicalizerPass());
   }
 
-  if (opts.emitMooreCfg) {
-    auto &cfgPM = pm.nest<moore::SVModuleOp>();
-    if (!opts.emitMooreCfgDir.empty())
-      cfgPM.addPass(
-          circt::pcov::createMooreExportProcessCFGPass(opts.emitMooreCfgDir));
-    else
-      cfgPM.addPass(circt::pcov::createMooreExportProcessCFGPass());
-  }
+  // TODO: re-enable CFG export once it is compatible with the path bitmap pass.
+  // if (opts.emitMooreCfg) {
+  //   auto &cfgPM = pm.nest<moore::SVModuleOp>();
+  //   if (!opts.emitMooreCfgDir.empty())
+  //     cfgPM.addPass(
+  //         circt::pcov::createMooreExportProcessCFGPass(opts.emitMooreCfgDir));
+  //   else
+  //     cfgPM.addPass(circt::pcov::createMooreExportProcessCFGPass());
+  // }
 }
 
 /// Convert Moore dialect IR into core dialect IR
@@ -709,6 +712,7 @@ int main(int argc, char **argv) {
   moore::registerPasses();
   circt::pcov::registerInsertHWProbePasses();
   circt::pcov::registerMooreInstrumentCoveragePass();
+  circt::pcov::registerMooreInstrumentPathBitmapPass();
   circt::pcov::registerMooreSummarizeCoveragePass();
   circt::pcov::registerMooreExportProcessCFGPass();
   registerMLIRContextCLOptions();

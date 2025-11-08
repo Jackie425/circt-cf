@@ -54,6 +54,7 @@ module or1200_tb_top (
     logic        sig_tick;
 
     logic [244:0] pcov_path;
+    logic         pcov_meta_reset;
 
     // Initialize control signals
     initial begin
@@ -66,6 +67,15 @@ module or1200_tb_top (
         dbg_adr = 32'h0;
         dbg_dat_i = 32'h0;
         pm_cpustall = 1'b0;
+        pcov_meta_reset = 1'b1;
+    end
+
+    // Pulse the coverage bitmap meta reset prior to starting the test.
+    initial begin
+        // Hold high until the external reset is low for a few cycles.
+        @(negedge rst);
+        repeat (4) @(posedge clk);
+        pcov_meta_reset = 1'b0;
     end
 
     // Simple instruction memory (initialized with NOP instructions)
@@ -215,8 +225,8 @@ module or1200_tb_top (
         .pm_wakeup_o(pm_wakeup),
         .pm_lvolt_o(pm_lvolt),
         .sig_tick(sig_tick),
-
-        .pcov_path(pcov_path)
+        .pcov_path(pcov_path),
+        .pcov_meta_reset(pcov_meta_reset)
     );
 
     // Monitor for debugging

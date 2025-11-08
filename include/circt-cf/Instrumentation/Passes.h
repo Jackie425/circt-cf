@@ -31,6 +31,9 @@ void registerInsertHWProbePasses();
 std::unique_ptr<mlir::Pass> createMooreInstrumentCoveragePass();
 void registerMooreInstrumentCoveragePass();
 
+std::unique_ptr<mlir::Pass> createMooreInstrumentPathBitmapPass();
+void registerMooreInstrumentPathBitmapPass();
+
 std::unique_ptr<mlir::Pass> createMooreSummarizeCoveragePass();
 void registerMooreSummarizeCoveragePass();
 

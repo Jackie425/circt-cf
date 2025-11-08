@@ -37,6 +37,24 @@ def MooreInstrumentCoverage
   ];
 }
 
+def MooreInstrumentPathBitmap
+    : Pass<"moore-instrument-path-bitmap", "::mlir::ModuleOp"> {
+  let summary = "Generate bitmap collectors for instrumented Moore procedures";
+  let description = [{
+    For every instrumented Moore procedure, insert a companion always block
+    that tracks which path IDs have been observed. The companion block shares
+    the original clock edge, listens to a design-wide meta reset signal, and
+    updates a per-procedure bitmap register. The pass also plumbs the new
+    meta reset input through the module hierarchy so that nested instances can
+    receive the signal even if they are not directly instrumented.
+  }];
+  let constructor = "circt::pcov::createMooreInstrumentPathBitmapPass()";
+  let dependentDialects = [
+    "circt::moore::MooreDialect",
+    "mlir::cf::ControlFlowDialect"
+  ];
+}
+
 def MooreSummarizeCoverage
     : Pass<"moore-summarize-coverage", "::mlir::ModuleOp"> {
   let summary = "Summarize Moore coverage instrumentation across the design";

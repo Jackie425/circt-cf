@@ -52,6 +52,7 @@ SIM_EXE     := $(OBJ_DIR)/Vor1200_tb_top
 VERILATOR_FLAGS := \
 	-cc --exe \
 	-O3 \
+	--timing \
 	-x-assign fast \
 	-x-initial fast \
 	-Wall \
