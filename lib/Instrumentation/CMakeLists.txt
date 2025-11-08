@@ -8,6 +8,7 @@ add_circt_library(CIRCTCFInstrumentation
   MooreExportProcessCFG.cpp
   MooreInstrumentCoverage.cpp
   MooreInstrumentPathBitmap.cpp
+  MooreInstrumentCoverageSum.cpp
   MooreSummarizeCoverage.cpp
   MooreProcedureAnalysis.cpp
 

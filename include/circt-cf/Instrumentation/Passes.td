@@ -55,6 +55,22 @@ def MooreInstrumentPathBitmap
   ];
 }
 
+def MooreInstrumentCoverageSum
+    : Pass<"moore-instrument-coverage-sum", "::mlir::ModuleOp"> {
+  let summary = "Propagate coverage bitmap counts through the module hierarchy";
+  let description = [{
+    Sums the number of covered points (unique bitmap bits) for each
+    instrumented module and propagates the cumulative counts through module
+    outputs. Each module exports a `pcov_covsum` port whose width is the
+    minimal number of bits required to represent the total number of coverage
+    points reachable beneath that module.
+  }];
+  let constructor = "circt::pcov::createMooreInstrumentCoverageSumPass()";
+  let dependentDialects = [
+    "circt::moore::MooreDialect"
+  ];
+}
+
 def MooreSummarizeCoverage
     : Pass<"moore-summarize-coverage", "::mlir::ModuleOp"> {
   let summary = "Summarize Moore coverage instrumentation across the design";

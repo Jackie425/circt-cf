@@ -55,7 +55,7 @@ module or1200_tb_top (
 
     logic [244:0] pcov_path;
     logic         pcov_meta_reset;
-
+    logic [7:0]   pcov_covsum;
     // Initialize control signals
     initial begin
         pic_ints = 20'h0;
@@ -226,7 +226,8 @@ module or1200_tb_top (
         .pm_lvolt_o(pm_lvolt),
         .sig_tick(sig_tick),
         .pcov_path(pcov_path),
-        .pcov_meta_reset(pcov_meta_reset)
+        .pcov_meta_reset(pcov_meta_reset),
+        .pcov_covsum(pcov_covsum)
     );
 
     // Monitor for debugging

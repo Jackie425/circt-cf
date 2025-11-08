@@ -50,6 +50,7 @@ int main(int argc, char **argv) {
   circt::pcov::registerInsertHWProbePasses();
   circt::pcov::registerMooreInstrumentCoveragePass();
   circt::pcov::registerMooreInstrumentPathBitmapPass();
+  circt::pcov::registerMooreInstrumentCoverageSumPass();
   circt::pcov::registerMooreSummarizeCoveragePass();
   circt::pcov::registerMooreExportProcessCFGPass();
   // If you need more custom passes in the future, add them here:

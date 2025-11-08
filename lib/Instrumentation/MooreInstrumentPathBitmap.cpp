@@ -23,6 +23,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/raw_ostream.h"
+#include <algorithm>
 #include <cstdlib>
 #include <optional>
 
@@ -41,6 +42,9 @@ static constexpr StringLiteral metaResetPortName = "pcov_meta_reset";
 static constexpr StringLiteral bitmapKind = "path_bitmap";
 static constexpr StringLiteral metaResetPortIndexAttr =
     "pcov.meta_reset.port_index";
+static constexpr StringLiteral covCountKind = "path_covcount";
+static constexpr StringLiteral covCountPointAttr =
+    "pcov.coverage.point_count";
 
 enum class VisitState { Visiting, Visited };
 
@@ -442,6 +446,31 @@ LogicalResult MooreInstrumentPathBitmapPass::buildBitmapController(
         "pcov.coverage.path_id_width",
         builder.getI32IntegerAttr(procInfo.pathIdType.getWidth()));
 
+    unsigned pointCount = procInfo.pathIdType.getWidth();
+    if (pointCount == 0)
+      pointCount = 1;
+    unsigned countWidth =
+        std::max(1u, llvm::Log2_64_Ceil(static_cast<uint64_t>(pointCount) + 1));
+    moore::IntType countType =
+        moore::IntType::getLogic(context, countWidth);
+    auto countRefType =
+        moore::RefType::get(llvm::cast<moore::UnpackedType>(countType));
+    Value countZero =
+        createZeroConstant(builder, sourceProc.getLoc(), countType);
+    auto countName =
+        (Twine("cov_proc") + Twine(procInfo.procIndex) + "_covsum_reg").str();
+    Value countReg = moore::VariableOp::create(
+        builder, sourceProc.getLoc(), countRefType,
+        builder.getStringAttr(countName), countZero);
+    countReg.getDefiningOp()->setAttr("pcov.coverage.kind",
+                                      builder.getStringAttr(covCountKind));
+    countReg.getDefiningOp()->setAttr(
+        "pcov.coverage.proc_index",
+        builder.getI32IntegerAttr(static_cast<int32_t>(procInfo.procIndex)));
+    countReg.getDefiningOp()->setAttr(
+        covCountPointAttr,
+        builder.getI32IntegerAttr(static_cast<int32_t>(pointCount)));
+
     OpBuilder procBuilder(moduleInfo.module);
     procBuilder.setInsertionPointAfter(sourceProc);
     auto procOp = moore::ProcedureOp::create(procBuilder, sourceProc.getLoc(),
@@ -494,6 +523,8 @@ LogicalResult MooreInstrumentPathBitmapPass::buildBitmapController(
       OpBuilder resetBuilder(resetBlock, resetBlock->begin());
       moore::NonBlockingAssignOp::create(resetBuilder, procOp.getLoc(),
                                          bitmapReg, bitmapZero);
+      moore::NonBlockingAssignOp::create(resetBuilder, procOp.getLoc(),
+                                         countReg, countZero);
       cf::BranchOp::create(resetBuilder, procOp.getLoc(), exitBlock);
     }
 
@@ -513,8 +544,27 @@ LogicalResult MooreInstrumentPathBitmapPass::buildBitmapController(
       Value nextBitmap =
           moore::OrOp::create(updateBuilder, procOp.getLoc(),
                               procInfo.pathIdType, currentBitmap, shifted);
+
+      Value alreadySet = moore::AndOp::create(updateBuilder, procOp.getLoc(),
+                                              procInfo.pathIdType,
+                                              currentBitmap, shifted);
+      Value isNewBit =
+          moore::EqOp::create(updateBuilder, procOp.getLoc(), alreadySet,
+                              bitmapZero);
+      Value currentCount = moore::ReadOp::create(
+          updateBuilder, procOp.getLoc(), countType, countReg);
+      Value isNewInt = isNewBit;
+      if (isNewBit.getType() != countType)
+        isNewInt = moore::ZExtOp::create(updateBuilder, procOp.getLoc(),
+                                         countType, isNewBit);
+      Value nextCount =
+          moore::AddOp::create(updateBuilder, procOp.getLoc(), countType,
+                               currentCount, isNewInt);
+
       moore::NonBlockingAssignOp::create(updateBuilder, procOp.getLoc(),
                                          bitmapReg, nextBitmap);
+      moore::NonBlockingAssignOp::create(updateBuilder, procOp.getLoc(),
+                                         countReg, nextCount);
       cf::BranchOp::create(updateBuilder, procOp.getLoc(), exitBlock);
     }
 

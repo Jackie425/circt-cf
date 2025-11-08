@@ -357,6 +357,7 @@ static void populateMooreTransforms(PassManager &pm) {
   if (!opts.disablePcovInstrumentation) {
     pm.addPass(circt::pcov::createMooreInstrumentCoveragePass());
     pm.addPass(circt::pcov::createMooreInstrumentPathBitmapPass());
+    pm.addPass(circt::pcov::createMooreInstrumentCoverageSumPass());
   }
   {
     auto &modulePM = pm.nest<moore::SVModuleOp>();
@@ -713,6 +714,7 @@ int main(int argc, char **argv) {
   circt::pcov::registerInsertHWProbePasses();
   circt::pcov::registerMooreInstrumentCoveragePass();
   circt::pcov::registerMooreInstrumentPathBitmapPass();
+  circt::pcov::registerMooreInstrumentCoverageSumPass();
   circt::pcov::registerMooreSummarizeCoveragePass();
   circt::pcov::registerMooreExportProcessCFGPass();
   registerMLIRContextCLOptions();
