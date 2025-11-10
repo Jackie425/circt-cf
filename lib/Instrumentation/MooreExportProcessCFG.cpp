@@ -278,6 +278,12 @@ void MooreExportProcessCFGPass::runOnOperation() {
   }
 
   for (moore::ProcedureOp proc : module.getOps<moore::ProcedureOp>()) {
+    if (!proc->hasAttr("pcov.coverage.instrumented"))
+      continue;
+    auto kindAttr = proc->getAttrOfType<StringAttr>("pcov.coverage.kind");
+    if (!kindAttr || kindAttr.getValue() != "path")
+      continue;
+
     IntegerAttr procIndexAttr =
         proc->getAttrOfType<IntegerAttr>("pcov.coverage.proc_index");
     if (!procIndexAttr)

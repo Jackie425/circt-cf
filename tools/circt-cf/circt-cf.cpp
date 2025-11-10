@@ -375,15 +375,14 @@ static void populateMooreTransforms(PassManager &pm) {
     anyPM.addPass(mlir::createCanonicalizerPass());
   }
 
-  // TODO: re-enable CFG export once it is compatible with the path bitmap pass.
-  // if (opts.emitMooreCfg) {
-  //   auto &cfgPM = pm.nest<moore::SVModuleOp>();
-  //   if (!opts.emitMooreCfgDir.empty())
-  //     cfgPM.addPass(
-  //         circt::pcov::createMooreExportProcessCFGPass(opts.emitMooreCfgDir));
-  //   else
-  //     cfgPM.addPass(circt::pcov::createMooreExportProcessCFGPass());
-  // }
+  if (opts.emitMooreCfg) {
+    auto &cfgPM = pm.nest<moore::SVModuleOp>();
+    if (!opts.emitMooreCfgDir.empty())
+      cfgPM.addPass(
+          circt::pcov::createMooreExportProcessCFGPass(opts.emitMooreCfgDir));
+    else
+      cfgPM.addPass(circt::pcov::createMooreExportProcessCFGPass());
+  }
 }
 
 /// Convert Moore dialect IR into core dialect IR
