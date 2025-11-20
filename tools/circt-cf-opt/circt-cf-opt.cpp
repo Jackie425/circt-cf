@@ -4,7 +4,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "circt-cf/Optimize/LLHD/Passes.h"
 #include "circt-cf/Optimize/Moore/Passes.h"
 #include "circt-cf/Instrumentation/Passes.h"
 #include "circt/InitAllDialects.h"

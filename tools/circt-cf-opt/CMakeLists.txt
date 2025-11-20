@@ -24,7 +24,6 @@ target_link_libraries(circt-cf-opt
   CIRCTTransforms
   
   # Your custom libraries
-  CIRCTCFLLHDTransforms
   CIRCTCFMooreTransforms
   CIRCTCFInstrumentation
   

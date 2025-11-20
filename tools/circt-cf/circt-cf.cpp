@@ -13,7 +13,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "circt-cf/Instrumentation/Passes.h"
-#include "circt-cf/Optimize/LLHD/Passes.h"
 #include "circt-cf/Optimize/Moore/Passes.h"
 #include "circt/Conversion/ExportVerilog.h"
 #include "circt/Conversion/HWToSV.h"
@@ -343,10 +342,11 @@ static void populateMooreTransforms(PassManager &pm) {
     // Perform module-specific transformations.
     auto &modulePM = pm.nest<moore::SVModuleOp>();
     modulePM.addPass(moore::createLowerConcatRefPass());
-
-    modulePM.addPass(circt::pcov::optimize::moore::createNormalizeProceduresPass()); // opt pass for or1200
+    // opt pass for or1200 & mor1kx
+    modulePM.addPass(circt::pcov::optimize::moore::createNormalizeProceduresPass());
     modulePM.addPass(circt::pcov::optimize::moore::createFoldStaticRegistersPass());
     modulePM.addPass(circt::pcov::optimize::moore::createFoldConstantBranchesPass());
+    modulePM.addPass(circt::pcov::optimize::moore::createMergeProceduresPass());
     // TODO: Enable the following once it not longer interferes with @(...)
     // event control checks. The introduced dummy variables make the event
     // control observe a static local variable that never changes, instead of

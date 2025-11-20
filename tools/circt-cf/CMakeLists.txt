@@ -1,7 +1,6 @@
 set(libs
   CIRCTCFInstrumentation
   CIRCTCFMooreTransforms
-  CIRCTCFLLHDTransforms
   CIRCTComb
   CIRCTDebug
   CIRCTExportVerilog
