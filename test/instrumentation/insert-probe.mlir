@@ -1,4 +1,4 @@
-// RUN: %circt-cf-opt --insert-hw-probes %s | FileCheck %s
+// RUN: %pcov-opt --insert-hw-probes %s | FileCheck %s
 
 hw.module @Foo() {
   hw.output

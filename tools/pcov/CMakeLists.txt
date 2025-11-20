@@ -1,6 +1,6 @@
 set(libs
-  CIRCTCFInstrumentation
-  CIRCTCFMooreTransforms
+  PCOVInstrumentation
+  PCOVMooreTransforms
   CIRCTComb
   CIRCTDebug
   CIRCTExportVerilog
@@ -31,8 +31,8 @@ set(libs
   MLIRLLVMIRTransforms
   )
 
-add_circt_tool(circt-cf circt-cf.cpp DEPENDS ${libs})
-target_link_libraries(circt-cf PRIVATE ${libs})
+add_circt_tool(pcov pcov.cpp DEPENDS ${libs})
+target_link_libraries(pcov PRIVATE ${libs})
 
-llvm_update_compile_flags(circt-cf)
-mlir_check_all_link_libraries(circt-cf)
+llvm_update_compile_flags(pcov)
+mlir_check_all_link_libraries(pcov)

@@ -1,10 +1,10 @@
 //===- FoldStaticRegisters.cpp - Collapse constant Moore variables -------===//
 //
-// Part of the circt-cf project.
+// Part of the pcov project.
 //
 //===----------------------------------------------------------------------===//
 
-#include "circt-cf/Optimize/Moore/Passes.h"
+#include "pcov/Optimize/Moore/Passes.h"
 
 #include "circt/Dialect/Moore/MooreAttributes.h"
 #include "circt/Dialect/Moore/MooreOps.h"
@@ -23,7 +23,7 @@ using namespace ::circt::moore;
 
 namespace circt::pcov::optimize::moore {
 #define GEN_PASS_DEF_FOLDSTATICREGISTERS
-#include "circt-cf/Optimize/Moore/Passes.h.inc"
+#include "pcov/Optimize/Moore/Passes.h.inc"
 } // namespace circt::pcov::optimize::moore
 
 namespace circt::pcov::optimize::moore {

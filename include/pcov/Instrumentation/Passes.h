@@ -1,6 +1,6 @@
 //===- Passes.h - Instrumentation pass entry points -------------*- C++ -*-===//
 //
-// Part of the circt-cf project.
+// Part of the pcov project.
 //
 //===----------------------------------------------------------------------===//
 //
@@ -8,8 +8,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef CIRCT_CF_INSTRUMENTATION_PASSES_H
-#define CIRCT_CF_INSTRUMENTATION_PASSES_H
+#ifndef PCOV_INSTRUMENTATION_PASSES_H
+#define PCOV_INSTRUMENTATION_PASSES_H
 
 #include "llvm/ADT/StringRef.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -23,7 +23,7 @@ class HWDialect;
 namespace pcov {
 
 #define GEN_PASS_DECL
-#include "circt-cf/Instrumentation/InstrumentationPasses.h.inc"
+#include "pcov/Instrumentation/InstrumentationPasses.h.inc"
 
 std::unique_ptr<mlir::Pass> createInsertHWProbePass();
 void registerInsertHWProbePasses();
@@ -48,4 +48,4 @@ void registerMooreExportProcessCFGPass();
 } // namespace pcov
 } // namespace circt
 
-#endif // CIRCT_CF_INSTRUMENTATION_PASSES_H
+#endif // PCOV_INSTRUMENTATION_PASSES_H

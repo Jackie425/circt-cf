@@ -1,4 +1,4 @@
-#include "circt-cf/Instrumentation/MooreProcedureAnalysis.h"
+#include "pcov/Instrumentation/MooreProcedureAnalysis.h"
 
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "llvm/ADT/SmallPtrSet.h"

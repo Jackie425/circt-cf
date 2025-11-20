@@ -1,13 +1,13 @@
 //===- InstrumentationPass.cpp - Basic instrumentation pass ---------------===//
 //
-// Part of the circt-cf project.
+// Part of the pcov project.
 //
 //===----------------------------------------------------------------------===//
 
-#include "circt-cf/Instrumentation/Passes.h"
+#include "pcov/Instrumentation/Passes.h"
 
 #define GEN_PASS_DEF_INSERTHWPROBE
-#include "circt-cf/Instrumentation/InstrumentationPasses.h.inc"
+#include "pcov/Instrumentation/InstrumentationPasses.h.inc"
 
 #include "circt/Dialect/HW/HWOps.h"
 #include "mlir/IR/Builders.h"

@@ -1,5 +1,5 @@
-#include "circt-cf/Instrumentation/MooreProcedureAnalysis.h"
-#include "circt-cf/Instrumentation/Passes.h"
+#include "pcov/Instrumentation/MooreProcedureAnalysis.h"
+#include "pcov/Instrumentation/Passes.h"
 
 #include "circt/Dialect/Moore/MooreOps.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
@@ -25,7 +25,7 @@ using namespace circt;
 
 namespace circt::pcov {
 #define GEN_PASS_DEF_MOOREEXPORTPROCESSCFG
-#include "circt-cf/Instrumentation/InstrumentationPasses.h.inc"
+#include "pcov/Instrumentation/InstrumentationPasses.h.inc"
 } // namespace circt::pcov
 
 namespace circt::pcov {

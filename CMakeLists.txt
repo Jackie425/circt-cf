@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(circt_cf LANGUAGES CXX C)
+project(pcov LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
@@ -33,20 +33,20 @@ if(NOT CIRCT_BUILD_TOOLS)
   set(CIRCT_BUILD_TOOLS ON CACHE BOOL "Build CIRCT-based tools" FORCE)
 endif()
 
-set(CIRCT_CF_MAIN_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-set(CIRCT_CF_MAIN_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
-set(CIRCT_CF_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/include)
-set(MLIR_TABLEGEN_OUTPUT_DIR ${CIRCT_CF_INCLUDE_DIR})
+set(PCOV_MAIN_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+set(PCOV_MAIN_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
+set(PCOV_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/include)
+set(MLIR_TABLEGEN_OUTPUT_DIR ${PCOV_INCLUDE_DIR})
 
 file(MAKE_DIRECTORY ${MLIR_TABLEGEN_OUTPUT_DIR})
-file(MAKE_DIRECTORY ${MLIR_TABLEGEN_OUTPUT_DIR}/circt-cf/Instrumentation)
-file(MAKE_DIRECTORY ${MLIR_TABLEGEN_OUTPUT_DIR}/circt-cf/Optimize)
-file(MAKE_DIRECTORY ${MLIR_TABLEGEN_OUTPUT_DIR}/circt-cf/Optimize/Moore)
-file(MAKE_DIRECTORY ${MLIR_TABLEGEN_OUTPUT_DIR}/circt-cf/Optimize/LLHD)
+file(MAKE_DIRECTORY ${MLIR_TABLEGEN_OUTPUT_DIR}/pcov/Instrumentation)
+file(MAKE_DIRECTORY ${MLIR_TABLEGEN_OUTPUT_DIR}/pcov/Optimize)
+file(MAKE_DIRECTORY ${MLIR_TABLEGEN_OUTPUT_DIR}/pcov/Optimize/Moore)
+file(MAKE_DIRECTORY ${MLIR_TABLEGEN_OUTPUT_DIR}/pcov/Optimize/LLHD)
 
 include_directories(
-  ${CIRCT_CF_MAIN_INCLUDE_DIR}
-  ${CIRCT_CF_INCLUDE_DIR}
+  ${PCOV_MAIN_INCLUDE_DIR}
+  ${PCOV_INCLUDE_DIR}
   ${CMAKE_CURRENT_BINARY_DIR}/lib/Instrumentation
   ${CMAKE_CURRENT_BINARY_DIR}/lib/Optimize/Moore
   ${CMAKE_CURRENT_BINARY_DIR}/lib/Optimize/LLHD
@@ -62,8 +62,8 @@ include_directories(SYSTEM
 add_subdirectory(lib)
 add_subdirectory(tools)
 
-option(CIRCT_CF_ENABLE_TESTS "Enable circt-cf lit tests" ON)
-if(CIRCT_CF_ENABLE_TESTS)
+option(PCOV_ENABLE_TESTS "Enable pcov lit tests" ON)
+if(PCOV_ENABLE_TESTS)
   include(CTest)
   enable_testing()
   add_subdirectory(test)

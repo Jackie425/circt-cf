@@ -1,9 +1,9 @@
-set(LLVM_TARGET_DEFINITIONS ${CMAKE_SOURCE_DIR}/include/circt-cf/Instrumentation/Passes.td)
-mlir_tablegen(circt-cf/Instrumentation/InstrumentationPasses.h.inc
+set(LLVM_TARGET_DEFINITIONS ${CMAKE_SOURCE_DIR}/include/pcov/Instrumentation/Passes.td)
+mlir_tablegen(pcov/Instrumentation/InstrumentationPasses.h.inc
   -gen-pass-decls -name Instrumentation)
-add_public_tablegen_target(CIRCTCFInstrumentationPassIncGen)
+add_public_tablegen_target(PCOVInstrumentationPassIncGen)
 
-add_circt_library(CIRCTCFInstrumentation
+add_circt_library(PCOVInstrumentation
   InsertHWProbe.cpp
   MooreExportProcessCFG.cpp
   MooreInstrumentCoverage.cpp
@@ -13,7 +13,7 @@ add_circt_library(CIRCTCFInstrumentation
   MooreProcedureAnalysis.cpp
 
   DEPENDS
-  CIRCTCFInstrumentationPassIncGen
+  PCOVInstrumentationPassIncGen
 
   LINK_LIBS PUBLIC
   CIRCTHW

@@ -1,2 +1,2 @@
-add_subdirectory(circt-cf)
-add_subdirectory(circt-cf-opt)
+add_subdirectory(pcov)
+add_subdirectory(pcov-opt)

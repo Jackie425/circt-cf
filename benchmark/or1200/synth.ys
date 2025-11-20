@@ -1,5 +1,5 @@
 # Minimal Yosys script to grab LUT/FF/BRAM/DSP counts for the OR1200 design
-# before and after pcov instrumentation. Both inputs come from the CIRCT-CF
+# before and after pcov instrumentation. Both inputs come from the pcov
 # pipeline to ensure a fair comparison.
 
 # No-coverage structural netlist

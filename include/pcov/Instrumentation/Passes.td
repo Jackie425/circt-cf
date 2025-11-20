@@ -1,11 +1,11 @@
 //===- InstrumentationPasses.td - Pass definitions --------------*- tablegen -*-===//
 //
-// Part of the circt-cf project.
+// Part of the pcov project.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef CIRCT_CF_INSTRUMENTATION_PASSES
-#define CIRCT_CF_INSTRUMENTATION_PASSES
+#ifndef PCOV_INSTRUMENTATION_PASSES
+#define PCOV_INSTRUMENTATION_PASSES
 
 include "mlir/Pass/PassBase.td"
 
@@ -110,4 +110,4 @@ def MooreExportProcessCFG
   ];
 }
 
-#endif // CIRCT_CF_INSTRUMENTATION_PASSES
+#endif // PCOV_INSTRUMENTATION_PASSES

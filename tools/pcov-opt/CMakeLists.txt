@@ -7,13 +7,13 @@ set(LLVM_LINK_COMPONENTS
   Support
 )
 
-add_circt_tool(circt-cf-opt
-  circt-cf-opt.cpp
+add_circt_tool(pcov-opt
+  pcov-opt.cpp
 )
 
-llvm_update_compile_flags(circt-cf-opt)
+llvm_update_compile_flags(pcov-opt)
 
-target_link_libraries(circt-cf-opt
+target_link_libraries(pcov-opt
   PRIVATE
   # Link all CIRCT dialects and conversions automatically
   ${dialect_libs}
@@ -24,8 +24,8 @@ target_link_libraries(circt-cf-opt
   CIRCTTransforms
   
   # Your custom libraries
-  CIRCTCFMooreTransforms
-  CIRCTCFInstrumentation
+  PCOVMooreTransforms
+  PCOVInstrumentation
   
   # MLIR libraries
   MLIRAffineDialect

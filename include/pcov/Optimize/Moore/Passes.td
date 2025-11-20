@@ -1,11 +1,11 @@
 //===- Passes.td - Moore optimization passes -------------*- tablegen -*-===//
 //
-// Part of the circt-cf project.
+// Part of the pcov project.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef CIRCT_CF_OPTIMIZE_MOORE_PASSES
-#define CIRCT_CF_OPTIMIZE_MOORE_PASSES
+#ifndef PCOV_OPTIMIZE_MOORE_PASSES
+#define PCOV_OPTIMIZE_MOORE_PASSES
 
 include "mlir/Pass/PassBase.td"
 
@@ -54,4 +54,4 @@ def FoldStaticRegisters : Pass<"moore-fold-static-registers", "::circt::moore::S
       "circt::pcov::optimize::moore::createFoldStaticRegistersPass()";
 }
 
-#endif // CIRCT_CF_OPTIMIZE_MOORE_PASSES
+#endif // PCOV_OPTIMIZE_MOORE_PASSES

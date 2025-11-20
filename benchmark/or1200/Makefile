@@ -1,11 +1,11 @@
-# Simple entry points to exercise the CIRCT-CF pipeline on or1200.
+# Simple entry points to exercise the pcov pipeline on or1200.
 DESIGN ?= or1200
 BUILD_DIR := build
 CFG_DIR := $(BUILD_DIR)/cfg
 SYNTH_DIR = $(BUILD_DIR)/synth
 
-CIRCT_CF ?= circt-cf
-CIRCT_CF_OPT ?= circt-cf-opt
+PCOV ?= pcov
+PCOV_OPT ?= pcov-opt
 
 DEBUG_OPTS ?=
 
@@ -18,28 +18,28 @@ default: run
 
 run:
 	mkdir -p $(BUILD_DIR) $(CFG_DIR)
-	$(CIRCT_CF) --ir-moore $(DEBUG_OPTS) $(CFG_ARGS) \
+	$(PCOV) --ir-moore $(DEBUG_OPTS) $(CFG_ARGS) \
 	  --mlir-print-ir-before=moore-instrument-coverage \
 	  -C $(DESIGN).f -o $(BUILD_DIR)/$(DESIGN)_moore_pcov.mlir 2> $(BUILD_DIR)/$(DESIGN)_moore.mlir
-	$(CIRCT_CF) --mlir-pretty-debuginfo --verbose-pass-executions \
+	$(PCOV) --mlir-pretty-debuginfo --verbose-pass-executions \
 	  $(DEBUG_OPTS) $(CFG_ARGS) --ir-hw -C $(DESIGN).f \
 	  -o $(BUILD_DIR)/$(DESIGN)_hw.mlir
-	$(CIRCT_CF) --mlir-pretty-debuginfo --verbose-pass-executions \
+	$(PCOV) --mlir-pretty-debuginfo --verbose-pass-executions \
 	  $(DEBUG_OPTS) $(CFG_ARGS) --ir-sv -C $(DESIGN).f \
 	  -o $(BUILD_DIR)/$(DESIGN)_sv.mlir
-	$(CIRCT_CF) --mlir-pretty-debuginfo --verbose-pass-executions \
+	$(PCOV) --mlir-pretty-debuginfo --verbose-pass-executions \
 	  $(DEBUG_OPTS) $(CFG_ARGS) --sv-sv -C $(DESIGN).f \
 	  -o $(BUILD_DIR)/$(DESIGN).sv
 
 run-base:
 	mkdir -p $(BUILD_DIR)
-	$(CIRCT_CF) --mlir-pretty-debuginfo --verbose-pass-executions \
+	$(PCOV) --mlir-pretty-debuginfo --verbose-pass-executions \
 	  $(DEBUG_OPTS) --disable-pcov-instrumentation --sv-sv -C $(DESIGN).f \
 	  -o $(BUILD_DIR)/$(DESIGN)_base.sv
 
 run-split:
 	mkdir -p $(BUILD_DIR)/split-output $(CFG_DIR)
-	$(CIRCT_CF) --verbose-pass-executions $(DEBUG_OPTS) $(CFG_ARGS) --sv-sv \
+	$(PCOV) --verbose-pass-executions $(DEBUG_OPTS) $(CFG_ARGS) --sv-sv \
 	  --split-verilog --split-verilog-dir=$(BUILD_DIR)/split-output \
 	  -C $(DESIGN).f
 

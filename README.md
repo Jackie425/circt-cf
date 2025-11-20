@@ -1,4 +1,4 @@
-# circt-cf
+# pcov
 
 Prototype CIRCT-based control-flow analysis and trace instrumentation tool that
 demonstrates how to build and ship custom passes out-of-tree. The repository
@@ -8,28 +8,29 @@ modules, and regression tests.
 
 ## Prerequisites
 
-This project depends on an existing LLVM/MLIR/CIRCT build. The commands below
-assume you already built CIRCT from the `~/circt-cf` checkout provided in
-the environment and that Ninja is available on `PATH`.
+This project depends on an existing LLVM/MLIR/CIRCT build and Ninja on `PATH`.
+Define two variables (adjust as needed):
 
-If you use a different checkout or install prefix, adjust the paths in the
-configuration examples accordingly.
+```bash
+export CIRCT_DIR=/path/to/circt      # CIRCT repository root
+export PCOV_DIR=/path/to/pcov        # this repository root
+```
 
 ## Configure & Build
 
 Configure the project against the in-tree build of LLVM/MLIR/CIRCT:
 
 ```bash
-cmake -S ~/circt-cf -B ~/circt-cf/build -G Ninja \
-  -DLLVM_DIR=~/circt/llvm/build/lib/cmake/llvm \
-  -DMLIR_DIR=~/circt/llvm/build/lib/cmake/mlir \
-  -DCIRCT_DIR=~/circt/build/lib/cmake/circt
+cmake -S "$PCOV_DIR" -B "$PCOV_DIR/build" -G Ninja \
+  -DLLVM_DIR="$CIRCT_DIR/llvm/build/lib/cmake/llvm" \
+  -DMLIR_DIR="$CIRCT_DIR/llvm/build/lib/cmake/mlir" \
+  -DCIRCT_DIR="$CIRCT_DIR/build/lib/cmake/circt"
 ```
 
 Then build the libraries and tool:
 
 ```bash
-ninja -C ~/circt-cf/build
+ninja -C "$PCOV_DIR/build"
 ```
 
 ## Tests
@@ -38,18 +39,18 @@ The repository comes with a small lit suite that exercises the instrumentation
 pass. Run it after each build:
 
 ```bash
-ninja -C ~/circt-cf/build check-circt-cf
+ninja -C "$PCOV_DIR/build" check-pcov
 ```
 
 ## Running the Tool
 
-The main executable lands in `~/circt-cf/build/bin/circt-cf`.
+The main executable lands in `$PCOV_DIR/build/bin/pcov`.
 Invoke it on MLIR files containing `hw.module` ops to stamp them with the
 `hw.probe` attribute:
 
 ```bash
-~/circt-cf/build/bin/circt-cf \
-  ~/circt-cf/test/instrumentation/insert-probe.mlir
+"$PCOV_DIR/build/bin/pcov" \
+  "$PCOV_DIR/test/instrumentation/insert-probe.mlir"
 ```
 
 Pass `--emit-bytecode` to emit MLIR bytecode instead of textual MLIR, or redirect
@@ -59,5 +60,5 @@ stdout to capture the instrumented module.
 
 - Add new passes under `lib/Instrumentation/` with associated TableGen entries.
 - Register additional command-line flags or pipeline wiring in
-  `tools/circt-cf/circt-cf.cpp`.
+  `tools/pcov/pcov.cpp`.
 - Add regression tests in `test/` and hook them into the lit suite.

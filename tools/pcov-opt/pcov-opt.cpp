@@ -1,11 +1,11 @@
-//===- circt-cf-opt.cpp - The circt-cf-opt driver ----------===//
+//===- pcov-opt.cpp - The pcov-opt driver -------------------===//
 //
 // CFA Trace optimizer driver for testing passes
 //
 //===----------------------------------------------------------------------===//
 
-#include "circt-cf/Optimize/Moore/Passes.h"
-#include "circt-cf/Instrumentation/Passes.h"
+#include "pcov/Optimize/Moore/Passes.h"
+#include "pcov/Instrumentation/Passes.h"
 #include "circt/InitAllDialects.h"
 #include "circt/Support/Version.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
