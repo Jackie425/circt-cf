@@ -12,3 +12,8 @@
 	path = benchmark/cva6/cva6
 	url = https://github.com/Jackie425/cva6.git
 	branch = master
+
+[submodule "benchmark/picorv32/picorv32"]
+	path = benchmark/picorv32/picorv32
+	url = https://github.com/Jackie425/picorv32.git
+	branch = master
